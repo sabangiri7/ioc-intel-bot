@@ -1,0 +1,35 @@
+# Optional outbound push of the IOC feed to SIEM destinations.
+# The pull API (config/api.yaml) is the primary path: any SIEM with an API key
+# can poll GET /api/v1/iocs?format=csv|json|stix. Use this file for SIEMs that
+# should receive the feed instead.
+#
+# Rows pushed are filtered by `min_severity` and `view`
+# (view: master | c2 | malware | importable).
+
+enabled: false
+min_severity: HIGH
+view: importable
+batch_limit: 5000
+
+targets: []
+# targets:
+#   - name: splunk-prod
+#     type: splunk_hec
+#     url: https://splunk.example:8088/services/collector/event
+#     token: CHANGE_ME_HEC_TOKEN
+#     sourcetype: ioc:intel
+#     verify_tls: false
+#
+#   - name: elastic-prod
+#     type: elastic
+#     url: https://elastic.example:9200
+#     index: ioc-indicators
+#     api_key: CHANGE_ME_ES_API_KEY
+#     verify_tls: false
+#
+#   - name: qradar-webhook
+#     type: webhook
+#     url: https://qradar.example/api/ioc-ingest
+#     headers:
+#       Authorization: Bearer CHANGE_ME
+#     verify_tls: true

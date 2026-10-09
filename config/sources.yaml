@@ -1,0 +1,198 @@
+# Source registry for IOC Intelligence Collection Bot
+# tier A: curated structured malware/C2 feeds (evidence: curation)
+# tier B: vendor/CERT/news reports (evidence: article text)
+# tier C: aggregated blocklists / context feeds (never importable alone)
+
+feeds:
+  - name: ThreatFox (abuse.ch)
+    kind: threatfox
+    tier: A
+    url: https://threatfox.abuse.ch/export/json/recent/
+    first_run_url: https://threatfox.abuse.ch/export/json/full/
+    enabled: true
+
+  - name: URLhaus (abuse.ch)
+    kind: urlhaus
+    tier: A
+    url: https://urlhaus.abuse.ch/downloads/csv_online/
+    enabled: true
+
+  - name: Feodo Tracker (abuse.ch)
+    kind: feodo
+    tier: A
+    ip_url: https://feodotracker.abuse.ch/downloads/ipblocklist.txt
+    browse_url: https://feodotracker.abuse.ch/browse/
+    enabled: true
+
+  - name: MalwareBazaar (abuse.ch)
+    kind: malwarebazaar
+    tier: A
+    url: https://bazaar.abuse.ch/export/csv/recent/
+    enabled: true
+
+  - name: CISA KEV
+    kind: cisa_kev
+    tier: A
+    url: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+    enabled: true
+
+mitre:
+  kind: mitre
+  enabled: true
+  tier: enrichment
+  url: https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json
+  refresh_days: 30
+  enabled: true
+
+# Tier B: full-article report ingestion. Articles are relevance-gated before fetch.
+reports:
+  - name: CISA Advisories
+    url: https://www.cisa.gov/cybersecurity-advisories/all.xml
+    tier: B
+    max_articles: 8
+    max_age_days: 30
+    enabled: true
+
+  - name: Cisco Talos
+    url: https://blog.talosintelligence.com/rss/
+    tier: B
+    max_articles: 8
+    max_age_days: 21
+    enabled: true
+
+  - name: Palo Alto Unit 42
+    url: https://unit42.paloaltonetworks.com/feed/
+    tier: B
+    max_articles: 8
+    max_age_days: 21
+    enabled: true
+
+  - name: Malwarebytes Research
+    url: https://blog.malwarebytes.com/feed/
+    tier: B
+    max_articles: 8
+    max_age_days: 21
+    enabled: true
+
+  - name: ESET WeLiveSecurity
+    url: https://www.welivesecurity.com/feed/
+    tier: B
+    max_articles: 8
+    max_age_days: 21
+    enabled: true
+
+  - name: Kaspersky Securelist
+    url: https://securelist.com/feed
+    tier: B
+    max_articles: 8
+    max_age_days: 30
+    enabled: true
+
+  - name: Check Point Research
+    url: https://research.checkpoint.com/feed/
+    tier: B
+    max_articles: 8
+    max_age_days: 30
+    enabled: true
+
+  - name: Microsoft Security Blog
+    url: https://www.microsoft.com/en-us/security/blog/feed/
+    tier: B
+    max_articles: 6
+    max_age_days: 21
+    enabled: true
+
+  - name: CrowdStrike Blog
+    url: https://www.crowdstrike.com/blog/feed/
+    tier: B
+    max_articles: 6
+    max_age_days: 21
+    enabled: true
+
+  - name: The Hacker News
+    url: https://feeds.feedburner.com/TheHackersNews
+    tier: B
+    max_articles: 10
+    max_age_days: 14
+    enabled: true
+
+  - name: BleepingComputer
+    url: https://www.bleepingcomputer.com/feed/
+    tier: B
+    max_articles: 10
+    max_age_days: 14
+    enabled: true
+
+  - name: KrebsOnSecurity
+    url: https://krebsonsecurity.com/feed/
+    tier: B
+    max_articles: 6
+    max_age_days: 21
+    enabled: true
+
+  - name: Help Net Security
+    url: https://www.helpnetsecurity.com/feed/
+    tier: B
+    max_articles: 6
+    max_age_days: 14
+    enabled: true
+
+  - name: GBHackers
+    url: https://gbhackers.com/feed/
+    tier: B
+    max_articles: 6
+    max_age_days: 14
+    enabled: true
+
+  - name: HackRead
+    url: https://www.hackread.com/feed/
+    tier: B
+    max_articles: 6
+    max_age_days: 14
+    enabled: true
+
+# Tier C: context-only aggregates. Confidence capped LOW -> never CrowdStrike importable alone.
+blocklists:
+  - name: Emerging Threats Compromised IPs
+    kind: ip_list
+    tier: C
+    url: https://rules.emergingthreats.net/blockrules/compromised-ips.txt
+    enabled: true
+
+  - name: Emerging Threats Block IPs
+    kind: ip_list
+    tier: C
+    url: https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt
+    enabled: false
+
+  - name: CI Army Bad Guys
+    kind: ip_list
+    tier: C
+    url: https://cinsscore.com/list/ci-badguys.txt
+    max_entries: 5000
+    enabled: true
+
+  - name: IPsum (DShield aggregates)
+    kind: ip_list
+    tier: C
+    url: https://raw.githubusercontent.com/stamparm/ipsum/master/ipsum.txt
+    max_entries: 5000
+    enabled: true
+
+  - name: DShield Block List
+    kind: ip_list
+    tier: C
+    url: https://www.dshield.org/block.txt
+    enabled: true
+
+  - name: ISC Suspicious Domains
+    kind: domain_list
+    tier: C
+    url: https://isc.sans.edu/api/suspiciousdomains_Low.txt
+    enabled: true
+
+  - name: OpenPhish
+    kind: url_list
+    tier: C
+    url: https://openphish.com/feed.txt
+    enabled: true

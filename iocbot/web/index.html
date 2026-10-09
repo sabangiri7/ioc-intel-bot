@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IOC Intel — Command Center</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233D9BFa' stroke-width='1.6' stroke-linejoin='round'%3E%3Cpath d='M12 2l8 3v6c0 5-3.4 8.6-8 11-4.6-2.4-8-6-8-11V5l8-3z'/%3E%3Cpath d='M8.5 12.2l2.4 2.4 4.6-4.8'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ============ login ============ -->
+<div id="login" class="overlay hidden">
+  <div class="card login-card">
+    <div class="brand brand-block">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+        <path d="M12 2l8 3v6c0 5-3.4 8.6-8 11-4.6-2.4-8-6-8-11V5l8-3z"/>
+        <path d="M8.5 12.2l2.4 2.4 4.6-4.8"/>
+      </svg>
+      <div>
+        <strong class="brand-name">IOC&nbsp;INTEL</strong>
+        <p class="muted" style="margin:2px 0 0">Threat-intelligence command center</p>
+      </div>
+    </div>
+
+    <form id="login-form" autocomplete="on">
+      <p class="muted">Sign in with your dashboard account.</p>
+      <label for="login-username">Username</label>
+      <input id="login-username" type="text" placeholder="analyst" autofocus autocomplete="username">
+      <label for="login-password">Password</label>
+      <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password">
+      <button id="login-btn" class="primary wide" type="submit">Sign in</button>
+      <p id="login-error" class="error"></p>
+    </form>
+
+    <div id="login-provision" class="hidden">
+      <div class="divider"></div>
+      <p class="muted">First run — create the administrator account.</p>
+      <label for="prov-username">Username</label>
+      <input id="prov-username" type="text" placeholder="analyst" autocomplete="username">
+      <label for="prov-password">Password</label>
+      <input id="prov-password" type="password" placeholder="at least 8 characters" autocomplete="new-password">
+      <button id="prov-btn" class="primary wide" type="button">Create account &amp; sign in</button>
+      <p id="prov-error" class="error"></p>
+    </div>
+
+    <div class="divider"></div>
+    <button id="login-tools" class="ghost" type="button">Advanced: use an API key</button>
+    <div id="login-advanced" class="hidden">
+      <p class="muted small">Paste a machine key (<code>iok_…</code>) to open the dashboard.</p>
+      <input id="login-key" type="password" placeholder="iok_...">
+      <button id="login-keybtn" class="ghost wide" type="button">Connect with key</button>
+      <p id="login-adv-error" class="error"></p>
+    </div>
+    <p class="muted small">Key management: <code>python3 -m iocbot.keys create &lt;name&gt; --scopes read,write,admin --platform Splunk</code></p>
+  </div>
+</div>
+
+<!-- ============ header ============ -->
+<header>
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+      <path d="M12 2l8 3v6c0 5-3.4 8.6-8 11-4.6-2.4-8-6-8-11V5l8-3z"/>
+      <path d="M8.5 12.2l2.4 2.4 4.6-4.8"/>
+    </svg>
+    <span class="brand-name">IOC&nbsp;INTEL</span>
+    <span class="conn" id="conn-chip"><span class="dot" id="conn-dot"></span>
+      <span class="conn-state muted" id="conn-state">connecting…</span></span>
+  </div>
+
+  <div class="search-wrap">
+    <svg class="s-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+      <circle cx="7" cy="7" r="4.6"/><path d="M10.6 10.6L14 14"/></svg>
+    <input id="search" type="search" placeholder="Search IOCs, domains, CVEs, malware, actors…">
+    <kbd class="hint">/</kbd>
+  </div>
+
+  <div class="actions">
+    <button id="btn-new" class="ghost" title="Add an IOC"><span class="ico">＋</span><span class="lbl">IOC</span></button>
+    <button id="btn-folder-new" class="ghost" title="Create a folder"><span class="ico">＋</span><span class="lbl">Folder</span></button>
+    <button id="btn-run" class="ghost" title="Run a collection cycle now"><span class="ico">▶</span><span class="lbl">Run</span></button>
+    <button id="btn-push" class="ghost" title="Push feed to SIEM targets"><span class="ico">⇪</span><span class="lbl">Push</span></button>
+    <button id="btn-keys" class="ghost" title="Manage API keys"><span class="ico">⚿</span><span class="lbl">Keys</span></button>
+    <button id="btn-logout" class="ghost icon-only" title="Forget key and disconnect">⏻</button>
+  </div>
+</header>
+
+<!-- ============ KPI strip ============ -->
+<div class="kpi-strip">
+  <div class="kpi" id="kpi-total">
+    <div class="k-ico" style="--kc:var(--accent)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M1.5 8h3l2.2-4 3 7 2-3h2.8"/></svg></div>
+    <div class="k-body"><div class="k-val" id="k-v-total">—</div><div class="k-lbl">Total IOCs</div></div>
+  </div>
+  <div class="kpi" id="kpi-critical">
+    <div class="k-ico" style="--kc:var(--crit)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 1.5v4M8 11v3M2.7 3.7l2.4 2M9.8 10l2.5 2.5M1.5 8h3M11 8h3.5M2.7 12.3L5 10"/></svg></div>
+    <div class="k-body"><div class="k-val crit" id="k-v-critical">—</div><div class="k-lbl">Critical</div></div>
+  </div>
+  <div class="kpi" id="kpi-high">
+    <div class="k-ico" style="--kc:var(--high)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 1.5v6m0 3v2M2.7 3.7l2.4 2M9.8 10l2.5 2.5"opacity=".6"/><path d="M8 2l6 5.5H2L8 2z" fill="currentColor" fill-opacity=".15"/></svg></div>
+    <div class="k-body"><div class="k-val high" id="k-v-high">—</div><div class="k-lbl">High</div></div>
+  </div>
+  <div class="kpi" id="kpi-importable">
+    <div class="k-ico" style="--kc:var(--ok)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="1.5" y="2" width="13" height="12" rx="2"/><path d="M3 6.5l3 3 6-6"/></svg></div>
+    <div class="k-body"><div class="k-val ok" id="k-v-importable">—</div><div class="k-lbl">Importable</div></div>
+  </div>
+  <div class="kpi" id="kpi-new">
+    <div class="k-ico" style="--kc:var(--med)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="5.5"/><path d="M8 4.5v3.5l2.5 1.5"/></svg></div>
+    <div class="k-body"><div class="k-val med" id="k-v-new">—</div><div class="k-lbl">New today</div></div>
+  </div>
+  <div class="k-shell">
+    <span class="muted small" id="last-run">no cycle yet</span>
+  </div>
+</div>
+
+<!-- ============ layout ============ -->
+<div class="layout">
+
+  <!-- ======== sidebar ======== -->
+  <aside>
+    <nav id="side-nav">
+      <div class="sec" data-sec="views">
+        <button class="sec-head"><span class="chev">▸</span> Views</button>
+        <div class="sec-body" data-body="views">
+          <li class="nav on" data-view="all" id="sv-all"><span class="n">All IOCs</span><span class="c" id="svc-all"></span></li>
+          <li class="nav" data-view="recent" id="sv-recent"><span class="n">Recently Added</span><span class="c" id="svc-recent"></span></li>
+          <li class="nav" data-view="critical" id="sv-critical"><span class="n">Critical</span><span class="c" id="svc-critical"></span></li>
+          <li class="nav" data-view="importable" id="sv-importable"><span class="n">SIEM-Importable</span><span class="c" id="svc-importable"></span></li>
+          <li class="nav" data-view="review" id="sv-review"><span class="n">Needs Review</span><span class="c" id="svc-review"></span></li>
+          <li class="nav" data-view="c2" id="sv-c2"><span class="n">C2 Infrastructure</span><span class="c" id="svc-c2"></span></li>
+          <li class="nav" data-view="malware" id="sv-malware"><span class="n">Malware Distribution</span><span class="c" id="svc-malware"></span></li>
+        </div>
+      </div>
+
+      <div class="sec" data-sec="sev">
+        <button class="sec-head"><span class="chev">▸</span> Severity</button>
+        <div class="sec-body" data-body="sev">
+          <div class="chips" id="severity-chips">
+            <button class="chip sev-CRITICAL" data-sev="CRITICAL">CRITICAL <b id="sc-CRITICAL"></b></button>
+            <button class="chip sev-HIGH" data-sev="HIGH">HIGH <b id="sc-HIGH"></b></button>
+            <button class="chip sev-MEDIUM" data-sev="MEDIUM">MEDIUM <b id="sc-MEDIUM"></b></button>
+            <button class="chip sev-LOW" data-sev="LOW">LOW <b id="sc-LOW"></b></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec grow" data-sec="folders">
+        <button class="sec-head"><span class="chev">▸</span> Threat Folders <span class="c" id="folder-count"></span></button>
+        <div class="sec-body" data-body="folders">
+          <div class="search-wrap small">
+            <svg class="s-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="7" cy="7" r="4.6"/><path d="M10.6 10.6L14 14"/></svg>
+            <input id="folder-search" type="search" placeholder="filter folders…">
+          </div>
+          <div id="folders" class="folder-list"></div>
+        </div>
+      </div>
+
+      <div class="sec" data-sec="sys">
+        <div class="sec-head static no-toggle">System</div>
+        <div class="sec-body" data-body="sys">
+          <li class="nav" id="nav-api"><span class="n">API &amp; Integrations</span><span class="c" id="svc-api">docs</span></li>
+          <li class="nav muted" id="nav-push"><span class="n">Push targets</span><span class="c"></span></li>
+          <li class="nav" id="btn-keys2"><span class="n">Manage API keys</span><span class="c" id="svc-keys"></span></li>
+        </div>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ======== main ======== -->
+  <main>
+
+    <!-- ------- IOCs page ------- -->
+    <div id="page-iocs">
+      <div class="crumbs" id="breadcrumb"></div>
+
+      <div class="page-head">
+        <div>
+          <h1 id="page-title">All IOCs</h1>
+          <p class="muted" id="page-desc">Every indicator currently in the intelligence base.</p>
+          <div class="meta" id="page-meta"></div>
+        </div>
+        <div class="page-actions">
+          <button id="btn-refresh" class="ghost icon-only" title="Refresh">↻</button>
+          <button id="btn-columns" class="ghost" title="Choose visible columns">Columns ▾</button>
+          <button id="export-csv" class="ghost" title="Download current selection as CSV">CSV</button>
+          <button id="export-stix" class="ghost" title="Download current selection as STIX 2.1">STIX</button>
+        </div>
+      </div>
+
+      <div class="summary" id="summary"></div>
+
+      <div class="bulk-bar hidden" id="bulk-bar">
+        <b id="bulk-count"></b> selected
+        <select id="bulk-folder" class="wide-sm"><option value="">Add to folder…</option></select>
+        <button id="bulk-apply" class="ghost small">Apply</button>
+        <button id="bulk-del" class="danger small">Delete</button>
+        <span class="spacer"></span>
+        <button id="bulk-clear" class="ghost small">Clear</button>
+      </div>
+
+      <div class="table-shell">
+        <div class="toolbar" id="iocs-toolbar">
+          <div id="active-filters" class="chips"></div>
+          <div class="spacer"></div>
+          <span id="result-count" class="muted"></span>
+          <select id="page-size" title="Page size">
+            <option>50</option><option>100</option><option>250</option><option>500</option>
+          </select>
+        </div>
+        <table id="iocs">
+          <thead>
+            <tr>
+              <th class="col-sel" data-col="sel"><input type="checkbox" id="check-all" title="Select all on this page"></th>
+              <th data-col="ioc" data-sort="ioc">IOC</th>
+              <th data-col="ioc_type" data-sort="ioc_type">Type</th>
+              <th data-col="severity" data-sort="severity">Severity</th>
+              <th data-col="confidence" data-sort="confidence">Confidence</th>
+              <th data-col="category">Category</th>
+              <th data-col="malware" data-sort="malware_family">Malware / Actor</th>
+              <th data-col="folders">Folders</th>
+              <th data-col="last_seen" data-sort="last_seen">Last seen</th>
+              <th class="col-actions" data-col="actions"></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <button id="prev">‹ Prev</button>
+        <span id="page-info" class="muted"></span>
+        <button id="next">Next ›</button>
+      </div>
+
+      <div id="context" class="context"></div>
+    </div>
+
+    <!-- ------- API & integrations page ------- -->
+    <div id="page-api" class="hidden">
+      <div class="crumbs">Intelligence <span>/</span> API &amp; Integrations</div>
+      <div class="page-head">
+        <div>
+          <h1>API &amp; Integrations</h1>
+          <p class="muted">SIEMs and analysts pull the same feed the bot produces — authenticate with an API key.</p>
+        </div>
+        <div class="page-actions">
+          <button id="api-copy-feed" class="ghost">Copy curl</button>
+        </div>
+      </div>
+
+      <div class="api-grid">
+        <div class="card slim">
+          <h3 class="card-h">Base URL</h3>
+          <code id="api-base" class="block wrap"></code>
+          <p class="muted small">Endpoint root. Versioned under <span class="mono">/api/v1</span>.</p>
+        </div>
+        <div class="card slim">
+          <h3 class="card-h">Authentication</h3>
+          <code class="block wrap">X-API-Key: <span id="api-key-short" class="mono"></span>…</code>
+          <p class="muted small">Also accepted: <span class="mono">Authorization: Bearer</span> or <span class="mono">?apikey=</span>. Scopes: read / write / admin.</p>
+        </div>
+
+        <div class="card slim">
+          <h3 class="card-h">Pull feed — CSV</h3>
+          <code id="api-feed" class="block wrap"></code>
+          <p class="muted small">Every field a SIEM reference set needs: IOC, type, severity, confidence, category, malware/actor, folders, validation, first/last seen, source, tags.</p>
+        </div>
+        <div class="card slim">
+          <h3 class="card-h">Pull feed — JSON</h3>
+          <code id="api-feed-json" class="block wrap"></code>
+          <p class="muted small">Sets <span class="mono">format=json</span>; returns <span class="mono">{"total", "count", "items"}</span>. Works for programmatic ingestion.</p>
+        </div>
+
+        <div class="card slim">
+          <h3 class="card-h">Pull feed — STIX 2.1</h3>
+          <code id="api-feed-stix" class="block wrap"></code>
+          <p class="muted small">STIX 2.1 indicator bundle with severity, family, actor, sources and folder context.</p>
+        </div>
+        <div class="card slim">
+          <h3 class="card-h">Single IOC</h3>
+          <code id="api-ioc-get" class="block wrap"></code>
+          <p class="muted small">Full record including categories, sources and folder membership.</p>
+        </div>
+
+        <div class="card slim span2">
+          <h3 class="card-h">Query parameters</h3>
+          <table class="kv params"><thead><tr><th>Param</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">view</td><td>master · c2 · malware · importable</td></tr>
+              <tr><td class="mono">min_severity</td><td>CRITICAL · HIGH · MEDIUM · LOW (threshold filter)</td></tr>
+              <tr><td class="mono">q</td><td>full-text search over value, family, actor, description, tags</td></tr>
+              <tr><td class="mono">ioc_type, severity, confidence, category, malware_family, threat_actor</td><td>comma-separated exact filters</td></tr>
+              <tr><td class="mono">folder_id</td><td>only members of one folder (auto or manual)</td></tr>
+              <tr><td class="mono">since, seen_since</td><td>updated_at / last_seen cutoffs (ISO or SQL datetime, e.g. 2026-09-28)</td></tr>
+              <tr><td class="mono">sort, order, limit, offset, format</td><td>sorting, pagination, output format (json · csv · stix)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card wide keys-card">
+        <div class="row gap between">
+          <h3 class="card-h">API keys</h3>
+          <button id="k-include-revoked" class="ghost small">show revoked</button>
+        </div>
+        <p class="muted small">Keys are shown only once at creation — rotate them if lost. The SIEM platform hint explains how to hook each platform up.</p>
+        <table class="kv"><thead>
+          <tr><th>Name</th><th>Scopes</th><th>Platform</th><th>Prefix</th><th>Created</th><th>Last used</th><th>Uses</th><th>Last IP</th><th></th></tr>
+        </thead><tbody id="keys-rows"></tbody></table>
+        <div class="row gap new-key">
+          <input id="k-name" placeholder="key name (e.g. splunk-prod)">
+          <select id="k-scopes" class="wide-sm"><option>read</option><option>read,write</option><option>admin</option></select>
+          <select id="k-platform" class="wide-md">
+            <option value="">Platform…</option>
+            <option value="Splunk">Splunk</option>
+            <option value="Elastic">Elasticsearch / Kibana</option>
+            <option value="Wazuh">Wazuh</option>
+            <option value="FortiSIEM">FortiSIEM</option>
+            <option value="CrowdStrike">CrowdStrike</option>
+            <option value="QRadar">IBM QRadar</option>
+            <option value="Sentinel">Microsoft Sentinel</option>
+            <option value="Other">Other / custom</option>
+          </select>
+          <button id="k-create" class="primary">Create</button>
+        </div>
+        <div id="k-platform-hint" class="hint-box"></div>
+        <div id="k-new-key" class="key-reveal hidden"></div>
+        <div id="k-error" class="error"></div>
+      </div>
+
+      <p class="muted small">Full endpoint reference lives in <span class="mono">docs/API.md</span>. Push workflow is configured in <span class="mono">config/push.yaml</span>.</p>
+    </div>
+
+  </main>
+</div>
+
+<!-- ============ detail drawer ============ -->
+<div id="drawer" class="drawer hidden">
+  <div class="drawer-head">
+    <span id="d-title" class="mono">IOC</span>
+    <div class="spacer"></div>
+    <span class="tag" id="d-type"></span>
+    <button id="d-close" class="icon-only ghost" title="Close">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="field"><label>Value</label><div id="d-ioc" class="mono break"></div></div>
+    <div class="row gap">
+      <div class="field"><label>Severity</label>
+        <select id="d-severity"><option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option></select>
+      </div>
+      <div class="field"><label>Confidence</label>
+        <select id="d-confidence"><option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option></select>
+      </div>
+      <div class="field"><label>Validation</label><div id="d-val"></div></div>
+    </div>
+    <div class="field"><label>Categories (semicolon separated)</label><input id="d-categories"></div>
+    <div class="row gap">
+      <div class="field"><label>Malware family</label><input id="d-family"></div>
+      <div class="field"><label>Threat actor</label><input id="d-actor"></div>
+    </div>
+    <div class="field"><label>Campaign</label><input id="d-campaign"></div>
+    <div class="field"><label>Description</label><textarea id="d-desc" rows="3"></textarea></div>
+    <div class="field"><label>Tags (semicolon separated)</label><input id="d-tags"></div>
+    <div class="row gap muted small">
+      <span>first: <span id="d-first"></span></span>
+      <span>last: <span id="d-last"></span></span>
+      <span>importable: <span id="d-imp"></span></span>
+    </div>
+    <div class="field"><label>Folders</label><div id="d-folders" class="chips"></div>
+      <div class="row gap">
+        <select id="d-folder-add"></select>
+        <button id="d-folder-add-btn" class="ghost">Add</button>
+      </div>
+    </div>
+    <div class="field"><label>Sources</label><div id="d-sources" class="mono small break"></div></div>
+  </div>
+  <div class="drawer-foot">
+    <button id="d-delete" class="danger">Delete</button>
+    <div class="spacer"></div>
+    <button id="d-save" class="primary">Save changes</button>
+  </div>
+</div>
+
+<!-- ============ new IOC modal ============ -->
+<div id="modal-new" class="overlay hidden">
+  <div class="card">
+    <h3 class="card-h">Add IOC</h3>
+    <div class="row gap">
+      <div class="field grow"><label>Value</label><input id="n-ioc" placeholder="1.2.3.4 / evil.com / sha256…"></div>
+      <div class="field"><label>Type</label><select id="n-type"></select></div>
+    </div>
+    <div class="row gap">
+      <div class="field"><label>Severity</label>
+        <select id="n-severity"><option>HIGH</option><option>CRITICAL</option><option>MEDIUM</option><option>LOW</option></select></div>
+      <div class="field"><label>Confidence</label>
+        <select id="n-confidence"><option>HIGH</option><option>MEDIUM</option><option>CRITICAL</option><option>LOW</option></select></div>
+    </div>
+    <div class="field"><label>Categories</label><input id="n-categories" placeholder="C2; MALWARE"></div>
+    <div class="row gap">
+      <div class="field grow"><label>Malware family</label><input id="n-family"></div>
+      <div class="field grow"><label>Threat actor</label><input id="n-actor"></div>
+    </div>
+    <div class="field"><label>Description</label><textarea id="n-desc" rows="2"></textarea></div>
+    <label class="row gap small"><input type="checkbox" id="n-force"> skip validation gate</label>
+    <div class="row gap">
+      <button id="n-cancel" class="ghost">Cancel</button>
+      <div class="spacer"></div>
+      <button id="n-save" class="primary">Create</button>
+    </div>
+    <div id="n-error" class="error"></div>
+  </div>
+</div>
+
+<!-- ============ new folder modal ============ -->
+<div id="modal-folder" class="overlay hidden">
+  <div class="card">
+    <h3 class="card-h">New folder</h3>
+    <div class="field"><label>Name</label><input id="f-name" placeholder="e.g. Qakbot drops"></div>
+    <div class="field"><label>Description</label><input id="f-desc"></div>
+    <div class="row gap">
+      <button id="f-cancel" class="ghost">Cancel</button>
+      <div class="spacer"></div>
+      <button id="f-save" class="primary">Create</button>
+    </div>
+    <div id="f-error" class="error"></div>
+  </div>
+</div>
+
+<!-- ============ push modal ============ -->
+<div id="modal-push" class="overlay hidden">
+  <div class="card wide">
+    <h3 class="card-h">Push to SIEM targets</h3>
+    <p class="muted small">Targets are defined in <code>config/push.yaml</code>.</p>
+    <div id="push-targets" class="chips"></div>
+    <table class="kv"><thead><tr><th>Target</th><th>Status</th><th>Sent</th><th>Detail</th><th>When</th></tr></thead>
+      <tbody id="push-rows"></tbody></table>
+    <div class="row gap">
+      <button id="p-trigger" class="primary">Push now</button>
+      <div class="spacer"></div>
+      <button id="p-close" class="ghost">Close</button>
+    </div>
+    <div id="p-error" class="error"></div>
+  </div>
+</div>
+
+<!-- ============ columns menu ============ -->
+<div id="columns-menu" class="popover hidden">
+  <div class="pop-title">Columns</div>
+  <label><input type="checkbox" data-col="ioc" checked> IOC</label>
+  <label><input type="checkbox" data-col="ioc_type" checked> Type</label>
+  <label><input type="checkbox" data-col="severity" checked> Severity</label>
+  <label><input type="checkbox" data-col="confidence" checked> Confidence</label>
+  <label><input type="checkbox" data-col="category" checked> Category</label>
+  <label><input type="checkbox" data-col="malware" checked> Malware / Actor</label>
+  <label><input type="checkbox" data-col="folders" checked> Folders</label>
+  <label><input type="checkbox" data-col="last_seen" checked> Last seen</label>
+</div>
+
+<div id="row-menu" class="popover hidden"></div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

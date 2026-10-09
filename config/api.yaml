@@ -1,0 +1,12 @@
+# IOC feed API + dashboard server (python3 -m iocbot.api.server)
+server:
+  # 0.0.0.0 = reachable on localhost and the LAN (SIEMs / analysts on other
+  # hosts). Lock it back to 127.0.0.1 to keep the dashboard machine-local.
+  host: 0.0.0.0
+  port: 8080
+
+auth:
+  # every /api/v1 request needs an API key (X-API-Key / Bearer / ?apikey=)
+  required: true
+  # on first run an admin key is written here (0600) - shown once in the log
+  bootstrap_key_file: data/keys/admin.key

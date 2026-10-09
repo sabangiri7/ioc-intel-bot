@@ -1,0 +1,43 @@
+# CrowdStrike Falcon export settings (export only: this bot never talks to any API)
+# Falcon custom IOC types: sha256, md5, domain, ipv4, ipv6
+# Falcon actions for domain/ipv4/ipv6: detect | no_action only (detect is used here)
+# Falcon severity values: informational | low | medium | high | critical
+
+columns:
+  - type
+  - value
+  - action
+  - severity
+  - source
+  - description
+  - expiration
+  - platforms
+  - tags
+
+action: detect
+platforms: windows,mac,linux
+expiration_days: 90
+description_max_chars: 500
+
+# Master IOC_TYPE -> Falcon type
+type_map:
+  IPv4: ipv4
+  IPv6: ipv6
+  Domain: domain
+  SHA256: sha256
+  MD5: md5
+
+severity_map:
+  CRITICAL: critical
+  HIGH: high
+  MEDIUM: medium
+
+# Inclusion thresholds (confidence AND severity must both qualify)
+confidence_threshold:
+  - MEDIUM
+  - HIGH
+  - CRITICAL
+severity_threshold:
+  - MEDIUM
+  - HIGH
+  - CRITICAL

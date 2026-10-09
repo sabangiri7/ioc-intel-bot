@@ -1,0 +1,265 @@
+# Validation rules: false-positive gates for the IOC collector
+
+# RFC 2606 / 6761 documentation and example names
+doc_domains:
+  - example.com
+  - example.org
+  - example.net
+  - example.edu
+  - example.info
+  - example.biz
+  - example.name
+  - example.pro
+  - test.com
+  - test.org
+  - test.net
+  - local
+  - domain.com
+  - website.com
+  - yourdomain.com
+  - yourwebsite.com
+  - sampledomain.com
+  - registrable.example
+
+# Single-label / reserved literals
+blocked_literals:
+  - localhost
+  - local
+  - test
+  - invalid
+  - example
+  - broadcasthost
+  - ip6-localhost
+  - ip6-loopback
+  - intranet
+  - internal
+  - lan
+  - home
+  - corp
+
+# Reserved TLDs / suffixes never valid as public indicators
+blocked_suffixes:
+  - local
+  - localhost
+  - test
+  - invalid
+  - example
+  - internal
+  - intranet
+  - lan
+  - home
+  - corp
+  - onion
+  - i2p
+
+# Generic software/vendor domains: rejected unless source explicitly labels them malicious
+generic_vendor_domains:
+  - microsoft.com
+  - windows.com
+  - windowsupdate.com
+  - live.com
+  - office.com
+  - outlook.com
+  - msftconnecttest.com
+  - google.com
+  - gstatic.com
+  - gmail.com
+  - youtube.com
+  - apple.com
+  - icloud.com
+  - amazon.com
+  - aws.amazon.com
+  - oracle.com
+  - java.com
+  - adobe.com
+  - ibm.com
+  - cisco.com
+  - vmware.com
+  - intel.com
+  - nvidia.com
+  - mozilla.org
+  - firefox.com
+  - opera.com
+  - brave.com
+  - telegram.org
+  - whatsapp.com
+  - zoom.us
+  - slack.com
+  - salesforce.com
+  - sap.com
+  - dell.com
+  - hp.com
+  - lenovo.com
+  - samsung.com
+  - dropbox.com
+  - box.com
+  - atlassian.com
+  - jira.com
+  - okta.com
+  - duo.com
+  - crowdstrike.com
+  - sentinelone.com
+  - fortinet.com
+  - paloaltonetworks.com
+  - proofpoint.com
+  - mimecast.com
+
+# Shared/public platforms: legitimate infrastructure frequently abused as payload
+# hosting. Kept in the master dataset (VALID) but never CrowdStrike importable.
+shared_platform_domains:
+  - github.com
+  - githubusercontent.com
+  - github.io
+  - githubassets.com
+  - gitlab.com
+  - gitee.com
+  - bitbucket.org
+  - sourceforge.net
+  - pastebin.com
+  - paste.ee
+  - hastebin.com
+  - discord.com
+  - discordapp.com
+  - discord.gg
+  - t.me
+  - telegram.me
+  - drive.google.com
+  - docs.google.com
+  - sheets.google.com
+  - dropbox.com
+  - dl.dropboxusercontent.com
+  - mega.nz
+  - mediafire.com
+  - sendspace.com
+  - transfer.sh
+  - file.io
+  - anonfiles.com
+  - temp.sh
+  - 0x0.st
+  - shorturl.at
+  - tinyurl.com
+  - bit.ly
+  - cutt.ly
+  - rebrand.ly
+  - wordpress.com
+  - blogspot.com
+  - medium.com
+  - substack.com
+  - tumblr.com
+  - wordpress.org
+  - wixsite.com
+  - squarespace.com
+  - weebly.com
+  - user-images.githubusercontent.com
+  - objects.githubusercontent.com
+  - storage.googleapis.com
+  - s3.amazonaws.com
+  - azurewebsites.net
+  - herokuapp.com
+  - vercel.app
+  - netlify.app
+  - pages.dev
+  - web.app
+  - firebaseapp.com
+  - ngrok.io
+  - ngrok.app
+  - trycloudflare.com
+  - loom.com
+  - vimeo.com
+  - dailymotion.com
+  - tiktok.com
+  - instagram.com
+  - facebook.com
+  - twitter.com
+  - x.com
+  - linkedin.com
+  - reddit.com
+  - quora.com
+  - yumpu.com
+  - scribd.com
+  - issuu.com
+  - archive.org
+  - wikipedia.org
+  - wikimedia.org
+
+# CDN / edge suffixes: shared infrastructure, never malicious on their own
+cdn_suffixes:
+  - cloudflare.com
+  - cloudflareinsights.com
+  - cdnjs.net
+  - akamaihd.net
+  - akamaized.net
+  - akamaitechnologies.com
+  - edgekey.net
+  - edgesuite.net
+  - fastly.net
+  - fastlylb.net
+  - stackpathcdn.com
+  - stackpath.com
+  - cloudfront.net
+  - azureedge.net
+  - azurefd.net
+  - trafficmanager.net
+  - edgecastcdn.net
+  - edgecast.com
+  - ll-nw.net
+  - hideme.su
+  - quantum.sk
+  - footprintcdn.com
+  - limelight.net
+  - edgeammo.com
+  - b-cdn.net
+  - cdn.net
+  - googleapis.com
+  - gstatic.com
+  - ggpht.com
+  - googleusercontent.com
+  - office.net
+  - office.com
+  - live.com
+  - outlook.com
+  - hubspot.net
+  - hubspotusercontent.com
+  - marketaux.com
+  - unpkg.com
+  - jsdelivr.net
+  - bootstrapcdn.com
+  - fontawesome.com
+  - typekit.net
+  - fonts.net
+
+# Placeholder / empty-file / test hashes: never indicators
+placeholder_hashes:
+  - 'd41d8cd98f00b204e9800998ecf8427e'
+  - '44d88612fea8a8f36de82e1278abb02f'
+  - '0cc175b9c0f1b6a831c399e269772661'
+  - '900150983cd24fb0d6963f7d28e17f72'
+  - 'e10adc3949ba59abbe56e057f20f883e'
+  - '5f4dcc3b5aa765d61d8327deb882cf99'
+  - 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+  - 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
+  - '00000000000000000000000000000000'
+  - '0000000000000000000000000000000000000000'
+  - '0000000000000000000000000000000000000000000000000000000000000000'
+  - 'ffffffffffffffffffffffffffffffffffffffff'
+  - 'ffffffffffffffffffffffffffffffffffffffff'
+  - 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+  - 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  - 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  - 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+  - deadbeef
+  - '11111111111111111111111111111111'
+  - '1234567890abcdef1234567890abcdef'
+  - '1234567890123456789012345678901234567890123456789012345678901234'
+
+# Extra blocked IP ranges (beyond Python's ipaddress private/reserved handling)
+blocked_ip_cidrs:
+  - 192.0.0.0/24
+  - 198.18.0.0/15
+  - 198.51.100.0/24
+  - 203.0.113.0/24
+  - 192.0.2.0/24
+  - 255.255.255.255/32
+  - 0.0.0.0/8
+  - 100.64.0.0/10
+  - 192.88.99.0/24

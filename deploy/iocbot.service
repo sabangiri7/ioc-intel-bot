@@ -1,0 +1,11 @@
+[Unit]
+Description=IOC intelligence collection cycle (12:00 / 16:00), then push to SIEM
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kali/ioc-intel-bot
+ExecStart=/usr/bin/python3 -m iocbot.cli
+ExecStart=/usr/bin/python3 -m iocbot.push
+
+[Install]
+WantedBy=timers.target
