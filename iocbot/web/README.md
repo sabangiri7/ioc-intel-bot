@@ -31,6 +31,8 @@ npm run dev          # http://localhost:5173
 
 ```bash
 npm run build        # type-check (tsc -b) + emit iocbot/web/dist
+npm run lint         # oxlint (config in .oxlintrc.json)
+npm run preview      # serve the built dist/ locally
 ```
 
 `dist/` is served by FastAPI at `/` and `/static`. Vite's `base` is set to

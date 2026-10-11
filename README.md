@@ -38,7 +38,7 @@ system built for that, after review.
 ## Requirements
 
 - **Python** ≥ 3.10
-- **Node.js** ≥ 20 (only to build the dashboard; Vite 8 needs a modern runtime)
+- **Node.js** ^20.19 or ≥ 22.12 (only to build the dashboard; Vite 8's minimum)
 
 ## Install
 
@@ -99,7 +99,7 @@ complete flag reference.
 |---|---|
 | **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Data flow, module map, storage schema, folder model |
 | **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** | Every config file and key, with security notes |
-| **[docs/SOURCES.md](docs/SOURCES.md)** | All 28 configured sources by tier, MITRE enrichment |
+| **[docs/SOURCES.md](docs/SOURCES.md)** | All 27 tiered sources + MITRE enrichment, by tier |
 | **[docs/API.md](docs/API.md)** | Full SIEM pull-API + dashboard endpoint reference |
 | **[docs/OPERATIONS.md](docs/OPERATIONS.md)** | Running, scheduling, key/user lifecycle, troubleshooting |
 | **[iocbot/web/README.md](iocbot/web/README.md)** | Front end (Vite + React): dev server, build, module map |
@@ -170,15 +170,15 @@ Full reason-code table: **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)**.
 
 ## Sources
 
-28 configured sources across three evidence tiers — see
-**[docs/SOURCES.md](docs/SOURCES.md)** for the complete table.
+28 configured sources: 27 across three evidence tiers plus MITRE enrichment —
+see **[docs/SOURCES.md](docs/SOURCES.md)** for the complete table.
 
-- **Tier A** structured feeds (high confidence): ThreatFox, URLhaus, Feodo
+- **Tier A** structured feeds (high confidence, 5): ThreatFox, URLhaus, Feodo
   Tracker, MalwareBazaar, CISA KEV.
-- **Tier B** reports (relevance-gated): 15 vendor/CERT/news RSS feeds →
+- **Tier B** reports (relevance-gated, 15): vendor/CERT/news RSS feeds →
   per-sentence IOC extraction and classification.
-- **Tier C** blocklists (context only, never importable alone): ET, CI Army,
-  IPsum, DShield, ISC, OpenPhish.
+- **Tier C** blocklists (context only, never importable alone, 7): ET Compromised
+  IPs, ET Block IPs *(disabled)*, CI Army, IPsum, DShield, ISC, OpenPhish.
 - **Enrichment:** MITRE ATT&CK STIX maps family/actor → technique IDs.
 
 ## Storage

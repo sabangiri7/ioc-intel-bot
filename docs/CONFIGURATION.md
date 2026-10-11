@@ -69,7 +69,7 @@ Full per-source table: [SOURCES.md](SOURCES.md).
 
 ## `config/validation.yaml`
 
-Nine top-level keys define the false-positive gates. Lower-cased into lookup sets
+Eight top-level keys define the false-positive gates. Lower-cased into lookup sets
 at startup. Returns three outcomes:
 
 | Status | Meaning | Importable? |

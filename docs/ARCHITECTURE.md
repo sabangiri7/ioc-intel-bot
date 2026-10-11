@@ -65,8 +65,10 @@ files, the API, the dashboard, and outbound push are all *views* over it.
 | `keys.py` | API-key and dashboard-user auth primitives (key generation, hashing, PBKDF2 passwords, scopes, sessions). |
 | `push.py` | Outbound SIEM push (Splunk HEC / Elasticsearch / webhook). |
 
-`iocbot/web/` holds the dashboard front-end (`index.html`, `app.js`, `style.css`)
-— static assets served by `api/server.py`, no Python.
+`iocbot/web/` holds the dashboard front-end — a Vite + React + TypeScript app
+(`src/`, built to `dist/`). `api/server.py` serves the build from `dist/` at `/`
+and `/static`; in development the Vite dev server proxies `/api` to the same
+backend instead. See [../iocbot/web/README.md](../iocbot/web/README.md).
 
 ## Storage schema — `data/state.db`
 

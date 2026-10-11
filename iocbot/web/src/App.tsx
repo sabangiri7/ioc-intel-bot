@@ -280,7 +280,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-[100dvh] flex-col overflow-hidden">
       <header className="flex items-center gap-4 border-b border-line bg-bg2 px-4 py-2.5">
         <div className="flex items-center gap-2 whitespace-nowrap">
           <ShieldCheck size={22} className="text-accent" />

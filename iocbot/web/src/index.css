@@ -34,8 +34,12 @@
   --color-danger: #e5484d;
   --color-danger-ink: #ffa6a6;
 
+  /* System stack. Inter is deliberately NOT included: it is the default
+     "AI-generated" typeface, and an operator tool should look like operator
+     tooling. Numbers use the mono stack below. */
   --font-sans:
-    -apple-system, 'Segoe UI', Roboto, 'Inter', Helvetica, Arial, sans-serif;
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
   --font-mono:
     ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas,
     'Liberation Mono', monospace;

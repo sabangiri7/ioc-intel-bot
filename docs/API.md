@@ -24,7 +24,7 @@ curl -H "X-API-Key: iok_..." "http://127.0.0.1:8080/api/v1/iocs?format=csv&min_s
 
 ## Authentication
 
-Every `/api/v1/*` request requires a key, **except** these five endpoints, which
+Every `/api/v1/*` request requires a key, **except** these six endpoints, which
 must stay reachable before you have one:
 
 | Unauthenticated endpoint | Why |
@@ -236,7 +236,7 @@ Applied to both `/api/v1/iocs` and `/api/v1/feed`.
 | Param | Meaning |
 |---|---|
 | `q` | Full-text search over value, family, actor, description, tags (FTS5). |
-| `ioc_type` | Filter types, comma list: `IPv4,IPv6,Domain,URL,SHA256,SHA1,MD5,Email,File-Name,CVE,Malware,Threat-Actor,Campaign`. |
+| `ioc_type` | Filter types, comma list: `IPv4,IPv6,Domain,URL,SHA256,SHA1,MD5,Email,File-Name,File-Path,CVE,Malware,Threat-Actor,Campaign`. |
 | `severity` | `CRITICAL,HIGH,MEDIUM,LOW` (comma list = OR). |
 | `confidence` | `CRITICAL,HIGH,MEDIUM,LOW`. |
 | `category` | Category labels present on the IOC (OR). |
@@ -312,7 +312,7 @@ POST /api/v1/auth/logout  # revoke the current session key
 | `POST /api/v1/auth/bootstrap` | none (first run only) |
 | `GET /api/v1/auth/me` | read |
 | `POST /api/v1/auth/logout` | read |
-| `GET /api/v1/stats`, `/cycles`, `/health` | read |
+| `GET /api/v1/stats`, `/cycles` | read |
 | `GET /api/v1/feed`, `/iocs`, `/iocs/{type}/{ioc}` | read |
 | `GET /api/v1/folders`, `/folders/{id}`, `/folders/{id}/iocs` | read |
 | `GET /api/v1/run`, `GET /api/v1/push` | read |

@@ -1,7 +1,9 @@
 # Data sources
 
-28 configured sources across three evidence tiers, plus MITRE enrichment.
-27 are enabled. Edit `config/sources.yaml` to change this list — see
+28 configured sources: **27** across three evidence tiers (5 Tier-A, 15 Tier-B,
+7 Tier-C) plus MITRE ATT&CK enrichment, which is a mapping rather than a feed.
+**26 of the 27 tiered sources are enabled** — Emerging Threats Block IPs is
+`enabled: false`. Edit `config/sources.yaml` to change this list — see
 [CONFIGURATION.md](CONFIGURATION.md) for the schema.
 
 ## What the tiers mean
