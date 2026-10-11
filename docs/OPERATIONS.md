@@ -196,6 +196,18 @@ git commit --no-verify                # emergency bypass (only if certain)
 
 Runtime state (`data/`) and exports (`output/`) are gitignored and never staged.
 
+To audit what was *ever* committed (not just staged), run the history scanner —
+it walks every blob on every ref:
+
+```bash
+python3 .githooks/scan_history.py
+```
+
+This repo's history has been audited and is clean (the only match is the hook's
+own private-key detection regex, which is expected). Re-run it after any history
+rewrite. If it finds a real credential, rotate it immediately and purge the blob
+(`git filter-repo` / BFG, then force-push).
+
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |
