@@ -131,13 +131,12 @@ def find_secrets(path: str) -> list[tuple[int, str, str, str]]:
                 # skip obvious code identifiers / dotted modules
                 if re.search(r"\.[a-z_]+$", probe) and "/" not in probe:
                     continue
-                # Skip assignments that just move data around rather than hold a
-                # literal secret, e.g. `let apiKey = localStorage.getItem(...)`
-                # or `const token = await refreshToken()`. A real credential is
-                # a quoted or bare literal, not the result of a call.
-                if re.search(r"[A-Za-z_$][\w.$]*\s*\(", probe) or re.search(
-                    r"\b(getItem|fetch|json|env|process|import|require)\b", probe
-                ):
+                # Skip assignments that just move data around rather than hold
+                # a literal secret, e.g. `let apiKey = localStorage.getItem(...)`
+                # or `const token = await refresh()`. Check the whole matched
+                # span, not just the captured value, because the call usually
+                # sits outside the captured characters.
+                if NOT_A_LITERAL.search(snippet):
                     continue
             hits.append((line_of(text, m.start()), rule_name, _redact(snippet), probe if val else ""))
     return hits
