@@ -44,6 +44,15 @@ const VIEWS: Record<ViewKey, { title: string; desc: string }> = {
 const SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const
 const PAGE_SIZES = [50, 100, 250, 500]
 
+// Value groups offered by the export selector. Empty string = every type.
+const EXPORT_TYPES: Record<string, string[]> = {
+  ip: ['IPv4', 'IPv6'],
+  hash: ['SHA256', 'SHA1', 'MD5'],
+  domain: ['Domain'],
+  url: ['URL'],
+}
+const EXPORT_LIMIT = 5000
+
 export default function App() {
   const [authed, setAuthed] = useState(Boolean(getKey()))
   const [page, setPage] = useState<'iocs' | 'api'>('iocs')
@@ -63,6 +72,7 @@ export default function App() {
   const [order, setOrder] = useState<'asc' | 'desc'>('desc')
   const [limit, setLimit] = useState(50)
   const [offset, setOffset] = useState(0)
+  const [exportType, setExportType] = useState('')
   const [hiddenColumns, setHiddenColumns] = useState<string[]>(() =>
     JSON.parse(localStorage.getItem('ioc_hide_cols') ?? '[]'),
   )
@@ -105,19 +115,25 @@ export default function App() {
     }
   }, [])
 
+  const effectiveFilters = useCallback((): SearchFilters => {
+    // Turn the sidebar "view" into concrete query params so both the table and
+    // the CSV export ask the API for exactly the same rows.
+    const f: SearchFilters = { ...filters }
+    if (view === 'critical') {
+      f.severity = ['CRITICAL']
+    } else if (view === 'importable') {
+      f.view = 'importable'
+    } else if (view === 'review') {
+      f.unreviewed = true
+    }
+    return f
+  }, [filters, view])
+
   const loadRows = useCallback(async () => {
     setLoading(true)
     setLoadError('')
     try {
-      const f: SearchFilters = { ...filters }
-      if (view === 'critical') {
-        f.severity = ['CRITICAL']
-      } else if (view === 'importable') {
-        f.view = 'importable'
-      } else if (view === 'review') {
-        f.unreviewed = true
-      }
-      const r = await api.search(f)
+      const r = await api.search(effectiveFilters())
       setRows(r.items)
       setTotal(r.total)
     } catch (err) {
@@ -125,7 +141,21 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [filters, view])
+  }, [effectiveFilters])
+
+  // Export the current filter set as a CSV download. Unlike the table this is
+  // not paginated, and an optional type scope limits it to one class of IOC.
+  const exportCsv = useCallback(() => {
+    const f: SearchFilters = {
+      ...effectiveFilters(),
+      format: 'csv',
+      limit: EXPORT_LIMIT,
+      offset: 0,
+    }
+    if (exportType) f.ioc_type = EXPORT_TYPES[exportType]
+    const path = folder ? `/folders/${folder.id}/iocs` : '/feed'
+    window.open(downloadUrl(path, f), '_blank')
+  }, [effectiveFilters, exportType, folder])
 
   useEffect(() => {
     if (!authed) return
@@ -501,8 +531,24 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    <Button onClick={() => window.open(downloadUrl('/feed', filters), '_blank')}>
-                      CSV
+                    <select
+                      className="ctl py-1 text-[12px]"
+                      value={exportType}
+                      onChange={(e) => setExportType(e.target.value)}
+                      aria-label="Export IOC types"
+                      title="Which IOC types the CSV export includes"
+                    >
+                      <option value="">All types</option>
+                      <option value="ip">IPs only</option>
+                      <option value="hash">Hashes only</option>
+                      <option value="domain">Domains only</option>
+                      <option value="url">URLs only</option>
+                    </select>
+                    <Button
+                      onClick={exportCsv}
+                      title="Export the current filters as CSV"
+                    >
+                      Export CSV
                     </Button>
                   </div>
                 </div>

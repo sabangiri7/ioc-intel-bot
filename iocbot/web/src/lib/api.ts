@@ -120,6 +120,7 @@ export interface PushLogEntry {
 export interface SearchFilters {
   q?: string
   view?: string
+  ioc_type?: string[]
   severity?: string[]
   min_severity?: string
   folder_id?: number
@@ -209,6 +210,7 @@ export function toQuery(filters: SearchFilters): string {
   }
   add('q', filters.q)
   add('view', filters.view)
+  add('ioc_type', filters.ioc_type)
   add('severity', filters.severity)
   add('min_severity', filters.min_severity)
   add('folder_id', filters.folder_id)

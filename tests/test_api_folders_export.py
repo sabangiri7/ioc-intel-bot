@@ -45,6 +45,46 @@ def _h(key):
     return {"X-API-Key": key}
 
 
+def test_feed_defaults_to_json_but_csv_is_exportable(client):
+    c, key = client
+    h = _h(key)
+    # No format param -> JSON. The dashboard's export button must ask for csv.
+    assert c.get("/api/v1/feed", headers=h).headers["content-type"].startswith(
+        "application/json"
+    )
+    out = c.get("/api/v1/feed?format=csv", headers=h).text
+    lines = out.strip().splitlines()
+    assert lines[0].startswith("IOC,")
+    assert len(lines) == 3  # header + IPv4 + Domain
+
+
+def test_feed_csv_can_scope_ioc_types(client):
+    c, key = client
+    h = _h(key)
+    ips = c.get("/api/v1/feed?format=csv&ioc_type=IPv4", headers=h).text
+    lines = ips.strip().splitlines()
+    assert lines[0].startswith("IOC,")
+    assert len(lines) == 2 and "1.2.3.4" in lines[1]
+
+    hashes = c.get("/api/v1/feed?format=csv&ioc_type=SHA256,SHA1,MD5", headers=h).text
+    assert len(hashes.strip().splitlines()) == 1  # header only
+
+    domains = c.get("/api/v1/feed?format=csv&ioc_type=Domain", headers=h).text
+    assert "evil.example" in domains and "1.2.3.4" not in domains
+
+
+def test_folder_iocs_csv_export(client):
+    c, key = client
+    h = _h(key)
+    folders = c.get("/api/v1/folders?include_zero=false", headers=h).json()["items"]
+    mirai = next(f for f in folders if f["name"] == "Mirai")
+    out = c.get(f"/api/v1/folders/{mirai['id']}/iocs?format=csv", headers=h)
+    assert out.headers["content-type"].startswith("text/csv")
+    lines = out.text.strip().splitlines()
+    assert lines[0].startswith("IOC,")
+    assert any("1.2.3.4" in line for line in lines[1:])
+
+
 def test_health_no_key(client):
     c, _ = client
     r = c.get("/api/v1/health", headers={"X-API-Key": ""})

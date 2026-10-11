@@ -127,7 +127,7 @@ export default function IocTable({
   const to = Math.min(offset + limit, total)
 
   return (
-    <div className="flex flex-col">
+    <div className="flex h-full flex-col">
       {selection.size > 0 && (
         <div className="flex items-center gap-2 border-b border-line bg-bg2 px-3 py-2">
           <b className="text-[12.5px]">{selection.size} selected</b>
@@ -170,9 +170,9 @@ export default function IocTable({
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full border-collapse text-[13px]">
-          <thead className="bg-bg2">
+          <thead className="sticky top-0 z-10 bg-bg2">
             <tr>
               <th className="w-8 px-3 py-2">
                 <input
