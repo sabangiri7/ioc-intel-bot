@@ -42,7 +42,6 @@ mitre:
   tier: enrichment
   url: https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json
   refresh_days: 30
-  enabled: true
 
 # Tier B: full-article report ingestion. Articles are relevance-gated before fetch.
 reports:

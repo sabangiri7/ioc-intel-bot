@@ -4,6 +4,10 @@ The bot serves **the same feed it exports** through an authenticated REST API at
 `/api/v1` so SIEMs, analysts, and scripts can pull indicators on demand. The
 dashboard at `http://127.0.0.1:8080/` talks to this same API.
 
+For architecture, configuration, sources, and day-to-day operation see
+[ARCHITECTURE.md](ARCHITECTURE.md), [CONFIGURATION.md](CONFIGURATION.md),
+[SOURCES.md](SOURCES.md), and [OPERATIONS.md](OPERATIONS.md).
+
 ## Quick start
 
 ```bash
@@ -20,8 +24,18 @@ curl -H "X-API-Key: iok_..." "http://127.0.0.1:8080/api/v1/iocs?format=csv&min_s
 
 ## Authentication
 
-Every `/api/v1/*` request (except `GET /health` and the one-time bootstrap
-claim) requires a key. Send it one of three ways:
+Every `/api/v1/*` request requires a key, **except** these five endpoints, which
+must stay reachable before you have one:
+
+| Unauthenticated endpoint | Why |
+|---|---|
+| `GET /api/v1/health` | Liveness probe |
+| `GET /api/v1/auth/status` | Drives the login page (tells it whether to show sign-in or first-run provisioning) |
+| `POST /api/v1/auth/login` | Username/password sign-in |
+| `POST /api/v1/auth/provision` | One-time first-run account creation (409 once a user exists) |
+| `POST /api/v1/auth/bootstrap` | One-time bootstrap-key claim (404 after first run) |
+
+Send a key one of three ways:
 
 | Method | Example |
 |---|---|
@@ -30,24 +44,41 @@ claim) requires a key. Send it one of three ways:
 | Query param | `?apikey=iok_...` (handy for curl / webhooks) |
 
 Scopes: `read`, `write`, `admin`. `admin` implies `read` + `write`.
-`read` unlocks search/feed/export/keys-listing*; `write` unlocks CRUD, folder
-membership, `POST /run` and `POST /push`; key lifecycle requires `admin`.
-\* listing keys requires `admin`.
 
-Keys are stored as SHA-256 hashes; the plaintext `iok_...+40 hex` is shown
-**once** at creation. Rotate to get a new plaintext (old key stops working).
+| Scope | Unlocks |
+|---|---|
+| `read` | `/iocs`, `/feed`, `/stats`, `/cycles`, `/health`, `/folders`, `/run` (GET), `/push` (GET), `/auth/me`, `/auth/logout` |
+| `write` | IOC create/update/delete, folder create/update/delete + membership, `POST /run`, `POST /push` |
+| `admin` | Everything above, plus the full `/keys` lifecycle |
+
+A `401` means missing/invalid key; a `403` means valid but insufficient scope.
+Keys are stored as SHA-256 hashes; the plaintext `iok_` + 40 hex is shown **once**
+at creation. Rotate to get a new plaintext (the old key stops working).
 
 ### First-run bootstrap
 
 On first start the server writes an admin key to `data/keys/admin.key`
-(mode 0600). Claim it **once** — either from the dashboard login card or:
+(mode 0600) — only if the key table is empty. Claim it **once**, either from the
+dashboard login card or:
 
 ```bash
 curl -X POST http://127.0.0.1:8080/api/v1/auth/bootstrap
-# -> {"name":"admin","key":"iok_..."}   (the file is deleted; 404 on later calls)
+# -> {"name":"admin","key":"iok_..."}   (the file is deleted)
 ```
 
-If it is already claimed, create another admin key locally with
+> While **no dashboard user exists yet**, a deleted bootstrap file is silently
+> re-created on the next start, so first-run setup cannot lock itself out. Once
+> an account exists, further claims return 404.
+
+Create the first dashboard user from the login page, or via
+`POST /api/v1/auth/provision` with `{"username","password"}` (username ≥ 2 chars,
+password ≥ 8 chars). Passwords are stored as PBKDF2-HMAC-SHA256, 260 000
+iterations. `POST /api/v1/auth/login` returns an admin-scoped **session key**
+(named `session:<username>`, one active per user; logging in rotates the
+previous one). `POST /api/v1/auth/logout` revokes it. `GET /api/v1/auth/me`
+reports the current key's identity and method.
+
+If auth is required but you are locked out, create another admin key locally:
 `python3 -m iocbot.keys create NAME --scopes read,write,admin`.
 
 ## Key management
@@ -81,8 +112,8 @@ an ingestion hint. Common values: `Splunk`, `Elastic`, `Wazuh`, `FortiSIEM`,
 ### `GET /api/v1/iocs` — search + export
 
 The workhorse endpoint. Returns paginated JSON by default; pass `format=csv` or
-`format=stix` to get a file-ready export (the `format` query param overrides the
-Accept header).
+`format=stix` to get a file-ready export. (There is no `Accept`-header handling —
+the `format` query parameter is the only way to change the output type.)
 
 ```bash
 curl -H "X-API-Key: iok_..." "http://127.0.0.1:8080/api/v1/iocs?limit=50&format=json"
@@ -110,7 +141,8 @@ JSON response:
 }
 ```
 
-CSV columns (also `IOC_FEED.csv`):
+CSV output (17 columns — the API's own richer set, which adds `CAMPAIGN`,
+`MITRE_ATTACK` and `DESCRIPTION` on top of the 14 columns in `IOC_FEED.csv`):
 
 ```
 IOC,IOC_TYPE,SEVERITY,CONFIDENCE,CATEGORY,MALWARE_FAMILY,THREAT_ACTOR,CAMPAIGN,
@@ -120,7 +152,8 @@ TAGS,MITRE_ATTACK,DESCRIPTION
 
 STIX returns a STIX 2.1 `indicator` bundle with `x_severity`,
 `x_malware_family`, `x_threat_actor`, `x_folders`, `x_sources` custom
-properties for context.
+properties for context. Confidence maps to STIX: LOW 30, MEDIUM 50, HIGH 75,
+CRITICAL 95.
 
 ### `GET /api/v1/feed` — SIEM pull feed
 
@@ -156,7 +189,7 @@ Applied to both `/api/v1/iocs` and `/api/v1/feed`.
 | `confidence` | `CRITICAL,HIGH,MEDIUM,LOW`. |
 | `category` | Category labels present on the IOC (OR). |
 | `malware_family`, `threat_actor` | Exact string matches. |
-| `min_severity` | Threshold: rows at/above this severity (adds to `severity`). |
+| `min_severity` | Threshold: rows at/above this severity (**single value only**). |
 | `validation` | Exact `validation_status` value. |
 | `unreviewed` | `true` → only rows with empty/`UNVERIFIED` validation (a.k.a. Needs Review). |
 | `importable` | `true` → only `crowdstrike_importable=YES`. |
@@ -169,6 +202,11 @@ Applied to both `/api/v1/iocs` and `/api/v1/feed`.
 | `limit` | 1–5000 (default 100 for `/iocs`, 1000 for `/feed`). |
 | `offset` | Page offset. |
 | `format` | `json` (default), `csv`, `stix`. |
+
+> **Gotcha:** `min_severity` takes a **single** severity level, not a comma list.
+> `min_severity=HIGH,CRITICAL` is silently ignored (the value is looked up as a
+> single key). To request a set, use `severity=HIGH,CRITICAL`; to request
+> "this level and above", use `min_severity=HIGH`.
 
 ```bash
 # secrets: pull everything CrowdStrike-importable, severity HIGH+, last seen this month
@@ -201,12 +239,36 @@ folder is rejected. Manual folders hold explicit membership added via
 GET  /api/v1/stats        # totals, by_severity/confidence/type/category/validation,
                           # importable, new_today, c2, malware, unreviewed, folders, last_cycle
 GET  /api/v1/cycles       # recent collection runs
-GET  /api/v1/health       # {"status":"ok","iocs":N} — no auth
-POST /api/v1/run          # start a collection cycle in the background (write)
+GET  /api/v1/health       # {"status":"ok","iocs":N,"version":...} — no auth
 GET  /api/v1/run          # {"running":...,"last_stats":...,"last_error":...}
+POST /api/v1/run          # start a collection cycle in the background (write) — returns immediately
 GET  /api/v1/push         # push config + push_log tail
-POST /api/v1/push         # trigger outbound push (write)
+POST /api/v1/push         # trigger outbound push (write) — runs synchronously, may block
+GET  /api/v1/auth/me      # current identity + auth method (session vs api_key)
+POST /api/v1/auth/logout  # revoke the current session key
 ```
+
+## Complete endpoint index
+
+| Endpoint | Scope |
+|---|---|
+| `GET /api/v1/health` | none |
+| `GET /api/v1/auth/status` | none |
+| `POST /api/v1/auth/provision` | none (first run only) |
+| `POST /api/v1/auth/login` | none |
+| `POST /api/v1/auth/bootstrap` | none (first run only) |
+| `GET /api/v1/auth/me` | read |
+| `POST /api/v1/auth/logout` | read |
+| `GET /api/v1/stats`, `/cycles`, `/health` | read |
+| `GET /api/v1/feed`, `/iocs`, `/iocs/{type}/{ioc}` | read |
+| `GET /api/v1/folders`, `/folders/{id}`, `/folders/{id}/iocs` | read |
+| `GET /api/v1/run`, `GET /api/v1/push` | read |
+| `POST /api/v1/iocs`, `PUT`/`DELETE /api/v1/iocs/{type}/{ioc}` | write |
+| `POST /api/v1/folders`, `PUT`/`DELETE /api/v1/folders/{id}` | write |
+| `POST`/`DELETE /api/v1/folders/{id}/iocs[/{type}/{ioc}]` | write |
+| `POST /api/v1/folders/sync` | write |
+| `POST /api/v1/run`, `POST /api/v1/push` | write |
+| `GET`/`POST /api/v1/keys`, `POST /keys/{id}/rotate`, `DELETE /keys/{id}` | admin |
 
 ## Configuration (`config/api.yaml`)
 
@@ -220,8 +282,26 @@ auth:
 ```
 
 The dashboard is served at `/` on the same process. `auth.required: true` guards
-the API but not the dashboard HTML itself — serve only on trusted hosts and keep
-the key out of scripts that don't need it.
+the API but **not** the dashboard HTML itself — `/` and `/static/*` are served
+without server-side auth, and the UI authenticates client-side. Serve only on
+trusted hosts.
+
+### Security notes
+
+- **No TLS.** The server is plain HTTP; API keys travel in cleartext. Bind to
+  `127.0.0.1` or terminate TLS in front of it before exposing the port.
+- **Default bind is `0.0.0.0`** (LAN-reachable) via `config/api.yaml`. The code
+  fallback when the file is absent is `127.0.0.1`.
+- **CORS is wildcard and hardcoded** — `allow_origins=["*"]`, `allow_methods=["*"]`,
+  `allow_headers=["*"]` (set in `api/server.py`, not configurable via YAML), so
+  SIEM consoles and the browser can call the API directly.
+- **`?apikey=` in a query string** is convenient but lands in access logs and
+  browser history — prefer the `X-API-Key` header.
+- **`--no-auth`** disables authentication entirely (local debugging only).
+- **First-run bootstrap** hands the admin plaintext to whoever reaches
+  `POST /api/v1/auth/bootstrap` while the file exists — claim it promptly.
+- Per-key `uses`/`last_ip` accounting is updated at most once per 60 s, and
+  `last_ip` trusts `X-Forwarded-For` unconditionally (no trusted-proxy config).
 
 ## Ingestion hints by platform
 

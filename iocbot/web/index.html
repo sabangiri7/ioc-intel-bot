@@ -9,50 +9,82 @@
 </head>
 <body>
 
-<!-- ============ login ============ -->
-<div id="login" class="overlay hidden">
-  <div class="card login-card">
-    <div class="brand brand-block">
-      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
-        <path d="M12 2l8 3v6c0 5-3.4 8.6-8 11-4.6-2.4-8-6-8-11V5l8-3z"/>
-        <path d="M8.5 12.2l2.4 2.4 4.6-4.8"/>
-      </svg>
-      <div>
-        <strong class="brand-name">IOC&nbsp;INTEL</strong>
-        <p class="muted" style="margin:2px 0 0">Threat-intelligence command center</p>
+<!-- ============ login (full single page) ============ -->
+<div id="login" class="login-page hidden">
+  <div class="login-bg" aria-hidden="true"></div>
+
+  <div class="login-wrap">
+    <!-- hero / intent -->
+    <section class="login-hero">
+      <div class="brand brand-block">
+        <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+          <path d="M12 2l8 3v6c0 5-3.4 8.6-8 11-4.6-2.4-8-6-8-11V5l8-3z"/>
+          <path d="M8.5 12.2l2.4 2.4 4.6-4.8"/>
+        </svg>
+        <div>
+          <strong class="brand-name">IOC&nbsp;INTEL</strong>
+          <p class="muted" style="margin:2px 0 0">Threat-intelligence command center</p>
+        </div>
       </div>
-    </div>
 
-    <form id="login-form" autocomplete="on">
-      <p class="muted">Sign in with your dashboard account.</p>
-      <label for="login-username">Username</label>
-      <input id="login-username" type="text" placeholder="analyst" autofocus autocomplete="username">
-      <label for="login-password">Password</label>
-      <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password">
-      <button id="login-btn" class="primary wide" type="submit">Sign in</button>
-      <p id="login-error" class="error"></p>
-    </form>
+      <h1 class="login-headline">Threat indicators, collected &amp; scored for analyst review.</h1>
+      <p class="login-sub">
+        This command center aggregates <strong>C2</strong>, <strong>malware distribution</strong>,
+        and <strong>cracked&nbsp;/&nbsp;pirated-software</strong> indicators from public
+        threat-intelligence feeds, deduplicates and scores them, and prepares them
+        for <em>manual</em> review and import.
+      </p>
 
-    <div id="login-provision" class="hidden">
-      <div class="divider"></div>
-      <p class="muted">First run — create the administrator account.</p>
-      <label for="prov-username">Username</label>
-      <input id="prov-username" type="text" placeholder="analyst" autocomplete="username">
-      <label for="prov-password">Password</label>
-      <input id="prov-password" type="password" placeholder="at least 8 characters" autocomplete="new-password">
-      <button id="prov-btn" class="primary wide" type="button">Create account &amp; sign in</button>
-      <p id="prov-error" class="error"></p>
-    </div>
+      <ul class="login-facts">
+        <li><span class="k">Read-only</span> public feeds, advisories and vendor blogs.</li>
+        <li><span class="k">No response action</span> &mdash; nothing is blocked or contained.</li>
+        <li><span class="k">Analyst in the loop</span> &mdash; outputs require human review.</li>
+      </ul>
+    </section>
 
-    <div class="divider"></div>
-    <button id="login-tools" class="ghost" type="button">Advanced: use an API key</button>
-    <div id="login-advanced" class="hidden">
-      <p class="muted small">Paste a machine key (<code>iok_…</code>) to open the dashboard.</p>
-      <input id="login-key" type="password" placeholder="iok_...">
-      <button id="login-keybtn" class="ghost wide" type="button">Connect with key</button>
-      <p id="login-adv-error" class="error"></p>
-    </div>
-    <p class="muted small">Key management: <code>python3 -m iocbot.keys create &lt;name&gt; --scopes read,write,admin --platform Splunk</code></p>
+    <!-- auth card -->
+    <section class="login-panel">
+      <div class="login-card">
+        <div id="login-signin">
+          <h2 class="login-title">Sign in</h2>
+          <p class="muted">Use your dashboard account.</p>
+          <form id="login-form" autocomplete="on">
+            <label for="login-username">Username</label>
+            <input id="login-username" type="text" placeholder="analyst" autofocus autocomplete="username">
+            <label for="login-password">Password</label>
+            <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password">
+            <button id="login-btn" class="primary wide" type="submit">Sign in</button>
+            <p id="login-error" class="error"></p>
+          </form>
+        </div>
+
+        <div id="login-provision" class="hidden">
+          <h2 class="login-title">Create the administrator account</h2>
+          <p class="muted">First run &mdash; set up the initial dashboard user, then sign in.</p>
+          <label for="prov-username">Username</label>
+          <input id="prov-username" type="text" placeholder="analyst" autocomplete="username">
+          <label for="prov-password">Password</label>
+          <input id="prov-password" type="password" placeholder="at least 8 characters" autocomplete="new-password">
+          <button id="prov-btn" class="primary wide" type="button">Create account &amp; sign in</button>
+          <p id="prov-error" class="error"></p>
+        </div>
+
+        <div class="divider"></div>
+
+        <button id="login-tools" class="ghost wide" type="button">Advanced: use an API key</button>
+        <div id="login-advanced" class="hidden">
+          <p class="muted small">Paste a machine key (<code>iok_&hellip;</code>) to open the dashboard.</p>
+          <input id="login-key" type="password" placeholder="iok_...">
+          <button id="login-keybtn" class="ghost wide" type="button">Connect with key</button>
+          <p id="login-adv-error" class="error"></p>
+        </div>
+
+        <p class="muted small login-foot">
+          Key management:
+          <code>python3 -m iocbot.keys create &lt;name&gt; --scopes read,write,admin --platform Splunk</code>
+        </p>
+      </div>
+    </section>
   </div>
 </div>
 

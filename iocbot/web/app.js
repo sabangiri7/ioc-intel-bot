@@ -83,7 +83,7 @@ async function refreshLoginMode() {
     const st = await res.json();
     const firstRun = Boolean(st.auth_required) && !st.has_users;
     $("login-provision").classList.toggle("hidden", !firstRun);
-    $("login-form").classList.toggle("hidden", firstRun);
+    $("login-signin").classList.toggle("hidden", firstRun);
   } catch (e) { /* keep whatever is on screen */ }
 }
 function setConn(stateName, label) {

@@ -24,9 +24,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Prepare runtime dirs
+        run: mkdir -p data/logs output
+
       - name: Run collection
         run: |
-          python -m iocbot.cli >> data/logs/cron.log 2>&1 || true
+          python -m iocbot.cli --json 2>&1 | tee data/logs/cron.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Publish cycle summary
+        if: always()
+        run: |
+          SUMMARY="$(ls -1 output/daily/*/IOC_SUMMARY.txt 2>/dev/null | tail -1 || true)"
+          if [ -n "$SUMMARY" ]; then
+            { echo '## IOC collection cycle'; echo; echo '```'; cat "$SUMMARY"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No IOC_SUMMARY.txt produced - the cycle did not complete.' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload outputs and logs
         if: always()
@@ -38,3 +52,4 @@ jobs:
             data/logs/
             data/state.db
           retention-days: 7
+          if-no-files-found: warn

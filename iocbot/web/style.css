@@ -371,6 +371,69 @@ code.block { display: block; background: var(--bg1); border: 1px solid var(--lin
 .field input, .field select, .field textarea { width: 100%; }
 .drawer .chips { margin-top: 2px; }
 
+/* ---------- login: full single page ---------- */
+.login-page {
+  position: fixed; inset: 0; z-index: 100;
+  background: var(--bg0); color: var(--text);
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+/* soft accent wash + grid so the page feels designed, not blank */
+.login-bg {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(1100px 500px at 12% -8%, rgba(61, 155, 250, .14), transparent 60%),
+    radial-gradient(900px 460px at 105% 8%, rgba(63, 185, 80, .07), transparent 55%),
+    linear-gradient(rgba(61, 155, 250, .045) 1px, transparent 1px) 0 0 / 100% 44px,
+    linear-gradient(90deg, rgba(61, 155, 250, .045) 1px, transparent 1px) 0 0 / 44px 100%;
+}
+.login-wrap {
+  position: relative; z-index: 1;
+  min-height: 100%; display: grid; gap: 40px;
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 460px);
+  align-items: center; justify-content: center;
+  max-width: 1120px; margin: 0 auto; padding: 48px 28px;
+}
+.login-hero { max-width: 560px; justify-self: end; }
+.login-headline {
+  margin: 26px 0 12px; font-size: 34px; line-height: 1.2; letter-spacing: -.02em; font-weight: 700;
+}
+.login-sub { color: var(--dim); font-size: 15px; line-height: 1.62; margin: 0 0 26px; }
+.login-sub strong { color: var(--text); font-weight: 600; }
+.login-facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.login-facts li {
+  display: flex; align-items: baseline; gap: 10px; color: var(--dim); font-size: 13.5px;
+  padding: 11px 14px; background: rgba(18, 25, 34, .55);
+  border: 1px solid var(--line); border-radius: var(--r);
+}
+.login-facts .k {
+  color: var(--accent); font-weight: 600; font-size: 11px; letter-spacing: .06em;
+  text-transform: uppercase; white-space: nowrap; min-width: 128px;
+}
+.login-panel { justify-self: start; width: 100%; }
+.login-card {
+  width: 100%; background: var(--bg2); border: 1px solid var(--line2);
+  border-radius: 14px; padding: 26px 24px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+}
+.login-title { margin: 0 0 4px; font-size: 19px; letter-spacing: -.01em; }
+.login-card label {
+  font-size: 10.5px; color: var(--faint); text-transform: uppercase;
+  letter-spacing: .07em; margin-top: 12px;
+}
+.login-card input { width: 100%; padding: 9px 11px; }
+.login-card button { margin-top: 14px; padding: 10px 12px; }
+.login-card .divider { margin: 20px 0 14px; }
+.login-card .error:empty { display: none; }
+.login-card .error { margin: 10px 0 0; }
+.login-foot { margin: 18px 0 0; line-height: 1.5; word-break: break-word; }
+.login-foot code { font-size: 11px; }
+
+@media (max-width: 900px) {
+  .login-wrap { grid-template-columns: 1fr; gap: 30px; padding: 36px 20px; }
+  .login-hero, .login-panel { justify-self: stretch; }
+  .login-headline { font-size: 27px; }
+  .login-facts .k { min-width: 0; }
+}
 /* ---------- overlays / cards / menus ---------- */
 .overlay {
   position: fixed; inset: 0; background: rgba(4, 7, 12, .74); z-index: 60;
@@ -385,9 +448,6 @@ code.block { display: block; background: var(--bg1); border: 1px solid var(--lin
 }
 .card.wide { width: 860px; max-width: 96vw; }
 .card .card-h { margin: 0; }
-.login-card { width: 410px; }
-.login-card label { font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .07em; margin-top: 4px; }
-.login-card input { width: 100%; }
 button.wide { width: 100%; }
 table.kv td, table.kv th { padding: 6px 9px; border-bottom: 1px solid var(--line); font-size: 12px; vertical-align: top; text-align: left; }
 table.kv { border-collapse: collapse; }
