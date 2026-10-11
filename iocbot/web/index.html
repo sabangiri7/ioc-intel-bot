@@ -69,9 +69,29 @@
           <p id="prov-error" class="error"></p>
         </div>
 
+        <div id="login-register" class="hidden">
+          <h2 class="login-title">Create an account</h2>
+          <p class="muted">Register to get dashboard access.</p>
+          <label for="reg-username">Username</label>
+          <input id="reg-username" type="text" placeholder="your.name" autocomplete="username">
+          <label for="reg-fullname">Full name <span class="muted">(optional)</span></label>
+          <input id="reg-fullname" type="text" placeholder="Jane Analyst" autocomplete="name">
+          <label for="reg-role">Access level</label>
+          <select id="reg-role"></select>
+          <p id="reg-role-help" class="muted small reg-help"></p>
+          <label for="reg-password">Password</label>
+          <input id="reg-password" type="password" placeholder="at least 8 characters" autocomplete="new-password">
+          <button id="reg-btn" class="primary wide" type="button">Create account &amp; sign in</button>
+          <p id="reg-error" class="error"></p>
+          <p class="muted small reg-note">Administrator access is granted by an existing admin, not at sign-up.</p>
+        </div>
+
         <div class="divider"></div>
 
-        <button id="login-tools" class="ghost wide" type="button">Advanced: use an API key</button>
+        <div class="login-switch">
+          <button id="login-register-toggle" class="ghost" type="button">Create an account</button>
+          <button id="login-tools" class="ghost" type="button">Use an API key</button>
+        </div>
         <div id="login-advanced" class="hidden">
           <p class="muted small">Paste a machine key (<code>iok_&hellip;</code>) to open the dashboard.</p>
           <input id="login-key" type="password" placeholder="iok_...">
@@ -189,9 +209,7 @@
       <div class="sec" data-sec="sys">
         <div class="sec-head static no-toggle">System</div>
         <div class="sec-body" data-body="sys">
-          <li class="nav" id="nav-api"><span class="n">API &amp; Integrations</span><span class="c" id="svc-api">docs</span></li>
-          <li class="nav muted" id="nav-push"><span class="n">Push targets</span><span class="c"></span></li>
-          <li class="nav" id="btn-keys2"><span class="n">Manage API keys</span><span class="c" id="svc-keys"></span></li>
+          <li class="nav" id="nav-api"><span class="n">API &amp; Integrations</span><span class="c" id="svc-api">keys &amp; docs</span></li>
         </div>
       </div>
     </nav>
@@ -357,6 +375,18 @@
         <div id="k-platform-hint" class="hint-box"></div>
         <div id="k-new-key" class="key-reveal hidden"></div>
         <div id="k-error" class="error"></div>
+      </div>
+
+      <div class="card wide users-card hidden" id="users-card">
+        <div class="row gap between">
+          <h3 class="card-h">Dashboard users</h3>
+          <span class="muted small">Accounts that can sign in to this dashboard</span>
+        </div>
+        <p class="muted small">Roles control what each account can do. Administrators grant the admin role; it cannot be self-assigned at sign-up.</p>
+        <table class="kv"><thead>
+          <tr><th>User</th><th>Role</th><th>Status</th><th>Created</th><th>Last login</th><th></th></tr>
+        </thead><tbody id="users-rows"></tbody></table>
+        <div id="u-error" class="error"></div>
       </div>
 
       <p class="muted small">Full endpoint reference lives in <span class="mono">docs/API.md</span>. Push workflow is configured in <span class="mono">config/push.yaml</span>.</p>

@@ -10,3 +10,7 @@ auth:
   required: true
   # on first run an admin key is written here (0600) - shown once in the log
   bootstrap_key_file: data/keys/admin.key
+  # self-service sign-up: a registrant picks viewer or analyst. "admin" is never
+  # self-assignable - an existing admin must grant it via PUT /api/v1/users/{id}/role.
+  # set false to close registration once your accounts exist.
+  allow_registration: true

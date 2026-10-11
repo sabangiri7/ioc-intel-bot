@@ -17,6 +17,25 @@ KEY_PREFIX = "iok_"
 ALL_SCOPES = ("read", "write", "admin")
 PBKDF2_ITER = 260_000
 
+# Dashboard roles. A role is a *label* that maps to the API scopes a session
+# key is granted. "admin" is deliberately separate from self-registration:
+# see SELF_REGISTER_ROLES below.
+ROLES = ("viewer", "analyst", "admin")
+ROLE_SCOPES = {
+    "viewer": "read",
+    "analyst": "read,write",
+    "admin": "admin,write,read",
+}
+ROLE_LABELS = {
+    "viewer": "Viewer — can search, view and export IOCs",
+    "analyst": "Analyst — can also create, edit and delete IOCs",
+    "admin": "Admin — full access incl. API keys and user management",
+}
+# Roles a user may grant THEMSELVES when registering. Admin is excluded on
+# purpose: allowing self-assignment of admin would let anyone who can reach the
+# registration endpoint take over the dashboard.
+SELF_REGISTER_ROLES = ("viewer", "analyst")
+
 
 def _now() -> str:
     return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -194,23 +213,72 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
+def normalize_role(role: str | None, allowed: tuple[str, ...] = ROLES,
+                   default: str = "viewer") -> str:
+    r = (role or "").strip().lower()
+    if not r:
+        return default
+    if r not in allowed:
+        raise ValueError(f"invalid role: {role!r} (choose one of {', '.join(allowed)})")
+    return r
+
+
 def create_user(conn: sqlite3.Connection, username: str, password: str,
-                full_name: str = "") -> dict:
+                full_name: str = "", role: str = "viewer",
+                allowed_roles: tuple[str, ...] = ROLES) -> dict:
     username = (username or "").strip().lower()
     if not username or len(username) < 2:
         raise ValueError("username must be at least 2 characters")
+    if not username.replace("_", "").replace("-", "").replace(".", "").isalnum():
+        raise ValueError("username may only contain letters, digits, . _ -")
     if not password or len(password) < 8:
         raise ValueError("password must be at least 8 characters")
+    if len(password) > 256:
+        raise ValueError("password must be at most 256 characters")
+    role = normalize_role(role, allowed_roles)
     row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     if row is not None:
         raise ValueError(f"user {username!r} already exists")
     conn.execute(
-        "INSERT INTO users (username, password_hash, full_name, created_at) "
-        "VALUES (?, ?, ?, ?)",
-        (username, hash_password(password), full_name.strip(), _now()),
+        "INSERT INTO users (username, password_hash, full_name, role, created_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (username, hash_password(password), full_name.strip(), role, _now()),
     )
     conn.commit()
     return get_user(conn, username)
+
+
+def list_users(conn: sqlite3.Connection) -> list[dict]:
+    return [dict(r) for r in conn.execute(
+        "SELECT id, username, full_name, role, disabled, created_at, last_login_at "
+        "FROM users ORDER BY username")]
+
+
+def set_user_role(conn: sqlite3.Connection, user_id: int, role: str) -> dict | None:
+    role = normalize_role(role)
+    conn.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+    conn.commit()
+    row = conn.execute(
+        "SELECT id, username, full_name, role, disabled, created_at, last_login_at "
+        "FROM users WHERE id = ?", (user_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def set_user_disabled(conn: sqlite3.Connection, user_id: int, disabled: bool) -> dict | None:
+    conn.execute("UPDATE users SET disabled = ? WHERE id = ?",
+                 (1 if disabled else 0, user_id))
+    conn.commit()
+    row = conn.execute(
+        "SELECT id, username, full_name, role, disabled, created_at, last_login_at "
+        "FROM users WHERE id = ?", (user_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def user_count(conn: sqlite3.Connection, role: str | None = None) -> int:
+    if role:
+        return conn.execute("SELECT COUNT(*) FROM users WHERE role = ?",
+                            (role,)).fetchone()[0]
+    return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
 
 def get_user(conn: sqlite3.Connection, username: str) -> dict | None:
@@ -222,6 +290,8 @@ def get_user(conn: sqlite3.Connection, username: str) -> dict | None:
 def auth_user(conn: sqlite3.Connection, username: str, password: str) -> dict | None:
     user = get_user(conn, username or "")
     if user is None or not verify_password(password or "", user["password_hash"]):
+        return None
+    if user.get("disabled"):
         return None
     conn.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (_now(), user["id"]))
     conn.commit()
@@ -237,23 +307,31 @@ def session_key_name(username: str) -> str:
 
 
 def create_session_key(conn: sqlite3.Connection, username: str) -> str:
-    """Issue a fresh admin-scoped dashboard session (one active per user)."""
+    """Issue a session key scoped to the user's role (one active per user).
+
+    The role decides the scopes: a viewer can only read, an analyst can also
+    write, an admin gets full access. Previously every session was hardcoded to
+    admin,write,read, which meant any logged-in account was a full admin.
+    """
+    user = get_user(conn, username)
+    role = (user or {}).get("role") or "viewer"
+    scopes = ROLE_SCOPES.get(role, ROLE_SCOPES["viewer"])
     name = session_key_name(username)
     plain = generate_key()
     row = conn.execute("SELECT id FROM api_keys WHERE name = ?", (name,)).fetchone()
     if row:
         # name is UNIQUE — reuse the existing session row instead of inserting
         conn.execute(
-            "UPDATE api_keys SET key_hash = ?, prefix = ?, scopes = 'admin,write,read', "
+            "UPDATE api_keys SET key_hash = ?, prefix = ?, scopes = ?, "
             "platform = 'session', revoked = 0, created_at = ?, last_used_at = '', "
             "last_ip = '', uses = 0 WHERE id = ?",
-            (hash_key(plain), plain[:11], _now(), row["id"]),
+            (hash_key(plain), plain[:11], scopes, _now(), row["id"]),
         )
     else:
         conn.execute(
             "INSERT INTO api_keys (name, prefix, key_hash, scopes, platform, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (name, plain[:11], hash_key(plain), "admin,write,read", "session", _now()),
+            "VALUES (?, ?, ?, ?, 'session', ?)",
+            (name, plain[:11], hash_key(plain), scopes, _now()),
         )
     conn.commit()
     return plain

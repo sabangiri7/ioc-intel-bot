@@ -76,7 +76,30 @@ function showLogin(msg) {
 }
 function hideLogin() { $("login").classList.add("hidden"); }
 
-/* Decide between first-run provisioning and the normal sign-in form. */
+/* Role options offered at sign-up. "admin" is intentionally absent: it must be
+   granted by an existing admin, never self-assigned. */
+const ROLE_OPTIONS = [
+  { value: "viewer", label: "Viewer — can search, view and export IOCs",
+    help: "Read-only. Good for analysts who mainly review and triage indicators." },
+  { value: "analyst", label: "Analyst — can also create, edit and delete IOCs",
+    help: "Read and write. Use if you need to curate, correct or remove indicators." },
+];
+
+function populateRoleSelect() {
+  const sel = $("reg-role");
+  if (!sel) return;
+  sel.innerHTML = ROLE_OPTIONS
+    .map((r) => `<option value="${r.value}">${esc(r.label)}</option>`).join("");
+  updateRoleHelp();
+  sel.onchange = updateRoleHelp;
+}
+function updateRoleHelp() {
+  const sel = $("reg-role");
+  const opt = ROLE_OPTIONS.find((r) => r.value === sel.value);
+  $("reg-role-help").textContent = opt ? opt.help : "";
+}
+
+/* Decide between first-run provisioning, sign-in, and registration. */
 async function refreshLoginMode() {
   try {
     const res = await fetch("/api/v1/auth/status");
@@ -84,6 +107,10 @@ async function refreshLoginMode() {
     const firstRun = Boolean(st.auth_required) && !st.has_users;
     $("login-provision").classList.toggle("hidden", !firstRun);
     $("login-signin").classList.toggle("hidden", firstRun);
+    // Registration is offered once an admin exists and the admin hasn't closed it.
+    const canRegister = Boolean(st.auth_required) && !firstRun && st.allow_registration !== false;
+    $("login-register-toggle").classList.toggle("hidden", firstRun || st.allow_registration === false);
+    if (canRegister) populateRoleSelect();
   } catch (e) { /* keep whatever is on screen */ }
 }
 function setConn(stateName, label) {
@@ -190,7 +217,11 @@ async function loadStats() {
     $("svc-importable").textContent = s.importable.toLocaleString();
     $("svc-c2").textContent = (s.c2 || 0).toLocaleString();
     $("svc-malware").textContent = (s.malware || 0).toLocaleString();
-    $("svc-review").textContent = (s.unreviewed || 0).toLocaleString();
+    // "Needs Review" is a work queue: hide it entirely when there is nothing
+    // to review, rather than offering a view that can only ever be empty.
+    const unreviewed = s.unreviewed || 0;
+    $("svc-review").textContent = unreviewed.toLocaleString();
+    $("sv-review").classList.toggle("hidden", unreviewed === 0);
     ["CRITICAL", "HIGH", "MEDIUM", "LOW"].forEach((k) => {
       const b = $(`sc-${k}`);
       if (b) b.textContent = (sev[k] || 0).toLocaleString();
@@ -250,9 +281,47 @@ function renderFolders() {
   });
 }
 
+function clearAllFilters() {
+  state.q = ""; $("search").value = "";
+  state.activeView = "all";
+  state.sev.clear();
+  state.folder = null;
+  state.unreviewed = false;
+  state.since = "";
+  state.offset = 0;
+  renderNav(); syncSevChips(); renderFolders();
+  loadRows(); renderActiveFilters();
+}
+
+/* Tell the user WHY the table is empty and give them a way out. */
+function emptyRowsHtml(message) {
+  const active = state.q || state.activeView !== "all" || state.sev.size ||
+                 state.folder || state.unreviewed || state.since;
+  const why = active
+    ? "<p>Nothing matches the filters currently applied.</p>" +
+      "<p class=\"muted small\">Try broadening the search, clearing a severity filter, or selecting All IOCs.</p>"
+    : `<p>${message}</p>`;
+  const action = active
+    ? `<button class="ghost" id="empty-clear">Clear all filters</button>`
+    : "";
+  return `<tr><td colspan="10" class="empty">
+    <div class="empty-inner">${why}${action}</div></td></tr>`;
+}
+
+function wireEmptyActions() {
+  const btn = $("empty-clear");
+  if (btn) btn.onclick = clearAllFilters;
+}
+
+function skeletonRows() {
+  const cells = Array.from({ length: 8 }, (_, i) =>
+    `<td><span class="sk sk-${i}"></span></td>`).join("");
+  return Array.from({ length: 6 }, () => `<tr class="sk-row"><td class="col-sel"></td>${cells}</tr>`).join("");
+}
+
 async function loadRows() {
   const rowsEl = $("rows");
-  rowsEl.innerHTML = `<tr><td colspan="10" class="empty">loading…</td></tr>`;
+  rowsEl.innerHTML = skeletonRows();
   try {
     const res = await api(`/iocs?${filters().toString()}`);
     state.total = res.total;
@@ -263,7 +332,13 @@ async function loadRows() {
     $("prev").disabled = state.offset === 0;
     $("next").disabled = to >= res.total;
     if (!res.items.length) {
-      rowsEl.innerHTML = `<tr><td colspan="10" class="empty">no IOCs match these filters</td></tr>`;
+      const msg = state.activeView === "review"
+        ? "<p>Every indicator in the database has a validation verdict.</p>" +
+          "<p class=\"muted small\">Nothing is waiting for review right now.</p>"
+        : "<p>No indicators have been collected yet.</p>" +
+          "<p class=\"muted small\">Run a collection cycle to populate the intelligence base.</p>";
+      rowsEl.innerHTML = emptyRowsHtml(msg);
+      wireEmptyActions();
       $("summary").innerHTML = "";
       $("context").innerHTML = "";
     } else {
@@ -444,16 +519,24 @@ function renderActiveFilters() {
   if (state.activeView !== "all") chips.push(["view", `view: ${VIEWS[state.activeView].title}`]);
   if (state.sev.size) chips.push(["sev", `severity: ${[...state.sev].join(",")}`]);
   if (state.folder) chips.push(["folder", `folder: ${state.folder.name}`]);
+  if (state.unreviewed) chips.push(["unrev", "needs review"]);
+  // One-click escape hatch when more than one filter is stacked up.
+  const clearAll = chips.length > 1
+    ? `<button class="chip clear-all" id="clear-all" title="Remove every filter">clear all ✕</button>`
+    : "";
   $("active-filters").innerHTML = chips.map(([k, label]) =>
-    `<button class="chip on" data-k="${k}">${esc(label)} ✕</button>`).join("");
-  $("active-filters").querySelectorAll(".chip").forEach((c) => {
+    `<button class="chip on" data-k="${k}" title="Remove this filter">${esc(label)} ✕</button>`).join("") + clearAll;
+  const ca = $("clear-all");
+  if (ca) ca.onclick = clearAllFilters;
+  $("active-filters").querySelectorAll(".chip[data-k]").forEach((c) => {
     c.onclick = () => {
       const k = c.dataset.k;
       if (k === "q") { state.q = ""; $("search").value = ""; }
       if (k === "view") { state.activeView = "all"; renderNav(); }
       if (k === "sev") { state.sev.clear(); syncSevChips(); }
       if (k === "folder") { state.folder = null; renderFolders(); }
-      state.offset = 0; loadRows();
+      if (k === "unrev") { state.unreviewed = false; }
+      state.offset = 0; loadRows(); renderActiveFilters();
     };
   });
 }
@@ -682,12 +765,66 @@ function keysRow(k) {
     <td class="nowrap">${actions}</td></tr>`;
 }
 
+async function loadUsers() {
+  try {
+    const res = await api("/users");
+    // Only admins can list users; non-admins just don't see the card.
+    const users = res.users || [];
+    const card = $("users-card");
+    card.classList.toggle("hidden", false);
+    $("users-rows").innerHTML = users.map((u) => {
+      const badge = `<span class="tag role-${esc(u.role)}">${esc(u.role)}</span>`;
+      const status = u.disabled ? `<span class="muted">disabled</span>`
+                                : `<span class="ok">active</span>`;
+      const sel = `<select class="role-sel" data-id="${u.id}">
+        <option value="viewer"${u.role === "viewer" ? " selected" : ""}>Viewer</option>
+        <option value="analyst"${u.role === "analyst" ? " selected" : ""}>Analyst</option>
+        <option value="admin"${u.role === "admin" ? " selected" : ""}>Admin</option>
+      </select>`;
+      const toggle = `<button class="ghost small" data-act="toggle" data-id="${u.id}">
+        ${u.disabled ? "Enable" : "Disable"}</button>`;
+      return `<tr>
+        <td><strong>${esc(u.username)}</strong>${u.full_name ? ` <span class="muted small">${esc(u.full_name)}</span>` : ""}</td>
+        <td>${badge}</td><td>${status}</td>
+        <td class="muted small">${esc((u.created_at || "").slice(0, 10))}</td>
+        <td class="muted small">${esc((u.last_login_at || "never").slice(0, 16))}</td>
+        <td class="nowrap">${sel} ${toggle}</td></tr>`;
+    }).join("");
+    $("users-rows").querySelectorAll(".role-sel").forEach((s) => {
+      s.onchange = async () => {
+        try {
+          await api(`/users/${s.dataset.id}/role`, { method: "PUT", body: { role: s.value } });
+          toast("role updated"); loadUsers();
+        } catch (err) { $("u-error").textContent = err.message; loadUsers(); }
+      };
+    });
+    $("users-rows").querySelectorAll("button[data-act=toggle]").forEach((b) => {
+      b.onclick = async () => {
+        try {
+          const uid = b.dataset.id;
+          const u = users.find((x) => String(x.id) === String(uid));
+          await api(`/users/${uid}/disabled`, { method: "PUT", body: { disabled: !u.disabled } });
+          toast(u.disabled ? "account enabled" : "account disabled");
+          loadUsers();
+        } catch (err) { $("u-error").textContent = err.message; }
+      };
+    });
+  } catch (e) {
+    // 403 => not an admin; hide the card entirely.
+    $("users-card").classList.add("hidden");
+  }
+}
+
 async function loadKeys() {
   try {
     const res = await api(`/keys?include_revoked=${state.keysShowRevoked ? "true" : "false"}`);
     $("k-include-revoked").textContent = state.keysShowRevoked ? "hide revoked" : "show revoked";
     $("keys-rows").innerHTML = res.items.map(keysRow).join("")
-      || `<tr><td colspan="9" class="muted">no keys</td></tr>`;
+      || `<tr><td colspan="9" class="muted"><div class="empty-inner">
+           <p>No API keys yet.</p>
+           <p class="muted small">Create one below to let a SIEM pull the feed.
+              Keys are shown once — copy the new key when you create it.</p>
+         </div></td></tr>`;
     $("keys-rows").querySelectorAll("button[data-act]").forEach((b) => {
       b.onclick = async () => {
         const id = b.dataset.id, act = b.dataset.act;
@@ -895,6 +1032,44 @@ function init() {
     }
   };
 
+  /* login: self-service registration with role selection */
+  $("login-register-toggle").onclick = () => {
+    const reg = $("login-register");
+    reg.classList.toggle("hidden");
+    $("login-signin").classList.toggle("hidden", !reg.classList.contains("hidden"));
+    if (!reg.classList.contains("hidden")) populateRoleSelect();
+  };
+
+  $("reg-btn").onclick = async () => {
+    const username = $("reg-username").value.trim();
+    const full_name = $("reg-fullname").value.trim();
+    const role = $("reg-role").value;
+    const password = $("reg-password").value;
+    const errEl = $("reg-error");
+    errEl.textContent = "";
+    if (!username || password.length < 8) {
+      errEl.textContent = "username required, password at least 8 characters";
+      return;
+    }
+    $("reg-btn").disabled = true;
+    try {
+      const res = await api("/auth/register", { method: "POST",
+        body: { username, password, full_name, role } });
+      state.key = res.key;
+      localStorage.setItem("ioc_key", res.key);
+      $("reg-password").value = "";
+      hideLogin();
+      boot();
+      toast(res.first_user
+        ? `account ${res.username} created as admin — signed in`
+        : `account ${res.username} created as ${res.role}`);
+    } catch (err) {
+      errEl.textContent = err.message === "API key required" ? "registration failed" : err.message;
+    } finally {
+      $("reg-btn").disabled = false;
+    }
+  };
+
   /* login: advanced API-key fallback */
   $("login-tools").onclick = () => $("login-advanced").classList.toggle("hidden");
   const connectWithKey = async () => {
@@ -1007,17 +1182,16 @@ function init() {
   $("d-folder-add-btn").onclick = addToFolder;
 
   /* keys + push + run + api page */
-  $("btn-keys").onclick = () => { showPage("api", ".keys-card"); loadKeys(); };
-  $("btn-keys2").onclick = () => { showPage("api", ".keys-card"); loadKeys(); };
+  const openApiPage = () => { showPage("api", ".keys-card"); loadKeys(); loadUsers(); };
+  $("btn-keys").onclick = openApiPage;
+  $("nav-api").onclick = openApiPage;
   $("k-include-revoked").onclick = () => { state.keysShowRevoked = !state.keysShowRevoked; loadKeys(); };
   $("k-create").onclick = createKey;
   $("k-platform").onchange = () => { $("k-platform-hint").innerHTML = platformHint($("k-platform").value); };
-  $("nav-push").onclick = () => { $("modal-push").classList.remove("hidden"); loadPush(); };
   $("btn-push").onclick = () => { $("modal-push").classList.remove("hidden"); loadPush(); };
   $("p-close").onclick = () => $("modal-push").classList.add("hidden");
   $("p-trigger").onclick = triggerPush;
   $("btn-run").onclick = triggerRun;
-  $("nav-api").onclick = () => showPage("api");
 
   /* keyboard */
   document.addEventListener("keydown", (e) => {

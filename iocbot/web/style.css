@@ -306,8 +306,32 @@ tbody tr.check { }
   line-height: 1; font-size: 14px; border-radius: 4px;
 }
 .kebab-btn:hover { background: var(--bg4); color: var(--text); border: 0; }
-.empty { padding: 46px 20px; text-align: center; color: var(--faint); }
+.empty { padding: 46px 20px; text-align: center; color: var(--dim); }
 .empty.error { color: #FF8D8D; }
+.empty-inner { max-width: 420px; margin: 0 auto; }
+.empty-inner p { margin: 0 0 8px; font-size: 13.5px; }
+.empty-inner button { margin-top: 12px; padding: 7px 14px; }
+
+/* one-click filter escape hatch inside the chip row */
+.chip.clear-all {
+  background: transparent; border-style: dashed; color: var(--dim);
+  font-size: 11.5px; padding: 3px 9px;
+}
+.chip.clear-all:hover { color: var(--text); border-style: solid; }
+
+/* loading skeleton: shape matches the real row so nothing jumps on arrival */
+@keyframes skPulse { 0%, 100% { opacity: .35; } 50% { opacity: .7; } }
+.sk-row td { padding: 0 12px; height: 38px; }
+.sk {
+  display: block; height: 9px; border-radius: 4px;
+  background: var(--bg4); animation: skPulse 1.4s ease-in-out infinite;
+}
+.sk-0 { width: 85%; } .sk-1 { width: 55%; } .sk-2 { width: 62%; }
+.sk-3 { width: 58%; } .sk-4 { width: 70%; } .sk-5 { width: 48%; }
+.sk-6 { width: 66%; } .sk-7 { width: 52%; }
+@media (prefers-reduced-motion: reduce) {
+  .sk { animation: none; opacity: .5; }
+}
 td.empty-l { }
 
 /* column hiding */
@@ -427,6 +451,18 @@ code.block { display: block; background: var(--bg1); border: 1px solid var(--lin
 .login-card .error { margin: 10px 0 0; }
 .login-foot { margin: 18px 0 0; line-height: 1.5; word-break: break-word; }
 .login-foot code { font-size: 11px; }
+.login-switch { display: flex; gap: 8px; }
+.login-switch button { flex: 1; margin-top: 0; }
+.reg-help { margin: 6px 0 0; line-height: 1.45; }
+.reg-note { margin: 10px 0 0; font-style: italic; opacity: .85; }
+#reg-role { width: 100%; }
+
+/* role badges in the users table */
+.tag.role-admin   { background: rgba(229,72,77,.15);  border-color: var(--danger); color: #FFA6A6; }
+.tag.role-analyst { background: rgba(240,165,60,.15); border-color: var(--high);   color: #FFD08A; }
+.tag.role-viewer  { background: rgba(63,185,80,.15);  border-color: var(--ok);     color: #9BE8A8; }
+.role-sel { padding: 4px 6px; font-size: 12px; }
+.users-card td { vertical-align: middle; }
 
 @media (max-width: 900px) {
   .login-wrap { grid-template-columns: 1fr; gap: 30px; padding: 36px 20px; }

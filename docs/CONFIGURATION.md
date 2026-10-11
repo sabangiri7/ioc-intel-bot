@@ -182,12 +182,16 @@ server:
 auth:
   required: true    # every /api/v1 call needs a key (except the few noted below)
   bootstrap_key_file: data/keys/admin.key   # path, relative to project root
+  allow_registration: true   # self-service account creation (see API.md)
 ```
 
 - `host: 0.0.0.0` is the **shipped** default (reachable from the LAN). The code
   fallback when `api.yaml` is absent is `127.0.0.1`.
 - `bootstrap_key_file` is a **path**, not a secret. On first start an admin key
   is generated and written there (mode 0600) if the key table is empty.
+- `allow_registration` (default `true`) exposes `POST /api/v1/auth/register`.
+  Registrants choose **viewer** or **analyst** only — `admin` is never
+  self-assignable. Set it to `false` to close sign-up once your accounts exist.
 - **Security:** the server is plain HTTP (no TLS) — API keys travel in cleartext.
   CORS is wildcard (`allow_origins=["*"]`, `allow_methods=["*"]`,
   `allow_headers=["*"]`) and hardcoded in `api/server.py` (not configurable).

@@ -30,9 +30,10 @@ must stay reachable before you have one:
 | Unauthenticated endpoint | Why |
 |---|---|
 | `GET /api/v1/health` | Liveness probe |
-| `GET /api/v1/auth/status` | Drives the login page (tells it whether to show sign-in or first-run provisioning) |
+| `GET /api/v1/auth/status` | Drives the login page (sign-in vs first-run provisioning, and whether registration is open) |
 | `POST /api/v1/auth/login` | Username/password sign-in |
-| `POST /api/v1/auth/provision` | One-time first-run account creation (409 once a user exists) |
+| `POST /api/v1/auth/register` | Self-service account creation (see **Users & roles** below) |
+| `POST /api/v1/auth/provision` | One-time first-run admin account creation |
 | `POST /api/v1/auth/bootstrap` | One-time bootstrap-key claim (404 after first run) |
 
 Send a key one of three ways:
@@ -54,6 +55,57 @@ Scopes: `read`, `write`, `admin`. `admin` implies `read` + `write`.
 A `401` means missing/invalid key; a `403` means valid but insufficient scope.
 Keys are stored as SHA-256 hashes; the plaintext `iok_` + 40 hex is shown **once**
 at creation. Rotate to get a new plaintext (the old key stops working).
+
+## Users & roles
+
+Dashboard accounts carry a **role**, and the role decides the scopes issued to
+their session key:
+
+| Role | Scopes | Can do |
+|---|---|---|
+| `viewer` | `read` | Search, view and export IOCs. No edits. |
+| `analyst` | `read,write` | Also create, edit and delete IOCs and folders. |
+| `admin` | `admin,write,read` | Everything, incl. API keys and user management. |
+
+> **A user may pick their own role at sign-up, but `admin` is never
+> self-assignable.** Anyone who can reach `POST /api/v1/auth/register` could
+> otherwise grant themselves full control. Registering with `role: "admin"`
+> returns **400**; an existing admin must grant it via
+> `PUT /api/v1/users/{id}/role`.
+
+### Register an account
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"jane","password":"longpassword","role":"analyst"}'
+# -> {"ok":true,"username":"jane","role":"analyst","key":"iok_...","first_user":false}
+```
+
+The response includes a ready-to-use session key. The **first** account ever
+created becomes `admin` automatically (there is no admin yet at that point, and
+it replaces the old bootstrap flow). Username must be ≥ 2 chars
+(letters/digits/`.`/`_`/`-`), password ≥ 8 chars, and reserved names
+(`admin`, `root`, `system`, …) are rejected.
+
+Set `auth.allow_registration: false` in `config/api.yaml` to close registration
+once your accounts exist.
+
+### Manage users (admin scope)
+
+```bash
+GET  /api/v1/users                    # list accounts + the role catalogue
+PUT  /api/v1/users/{id}/role          {"role":"analyst"}
+PUT  /api/v1/users/{id}/disabled      {"disabled":true}
+```
+
+Safety rails: the **last remaining admin cannot be demoted or disabled** (409),
+so you can never lock every administrator out. Disabling an account also revokes
+its active session, and a disabled account cannot log in. Non-admins calling
+these endpoints get 403.
+
+> Accounts that predate this feature are migrated to `admin`, preserving their
+> previous (effectively full-access) behaviour.
 
 ### First-run bootstrap
 
@@ -256,6 +308,7 @@ POST /api/v1/auth/logout  # revoke the current session key
 | `GET /api/v1/auth/status` | none |
 | `POST /api/v1/auth/provision` | none (first run only) |
 | `POST /api/v1/auth/login` | none |
+| `POST /api/v1/auth/register` | none (unless `allow_registration: false`) |
 | `POST /api/v1/auth/bootstrap` | none (first run only) |
 | `GET /api/v1/auth/me` | read |
 | `POST /api/v1/auth/logout` | read |
@@ -269,6 +322,7 @@ POST /api/v1/auth/logout  # revoke the current session key
 | `POST /api/v1/folders/sync` | write |
 | `POST /api/v1/run`, `POST /api/v1/push` | write |
 | `GET`/`POST /api/v1/keys`, `POST /keys/{id}/rotate`, `DELETE /keys/{id}` | admin |
+| `GET /api/v1/users`, `PUT /users/{id}/role`, `PUT /users/{id}/disabled` | admin |
 
 ## Configuration (`config/api.yaml`)
 
@@ -279,6 +333,7 @@ server:
 auth:
   required: true
   bootstrap_key_file: data/keys/admin.key
+  allow_registration: true    # self-service sign-up (viewer/analyst only)
 ```
 
 The dashboard is served at `/` on the same process. `auth.required: true` guards

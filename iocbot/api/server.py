@@ -62,6 +62,10 @@ STIX_PATTERNS = {
 
 STIX_CONFIDENCE = {"LOW": 30, "MEDIUM": 50, "HIGH": 75, "CRITICAL": 95}
 
+# Usernames that can never be claimed by registration (they collide with
+# internal key/session naming).
+RESERVED_USERNAMES = ("admin", "root", "session", "api", "system", "bootstrap")
+
 
 # -- config -----------------------------------------------------------------
 def load_config(config_dir: Path | None = None) -> dict:
@@ -71,16 +75,22 @@ def load_config(config_dir: Path | None = None) -> dict:
     if path.is_file():
         cfg = yaml.safe_load(path.read_text()) or {}
     server = cfg.get("server") or {}
+    auth = cfg.get("auth") or {}
     return {
         "host": str(server.get("host", "127.0.0.1")),
         "port": int(server.get("port", 8080)),
-        "auth_required": bool((cfg.get("auth") or {}).get("required", True)),
-        "bootstrap_key_file": str(
-            (cfg.get("auth") or {}).get("bootstrap_key_file", "data/keys/admin.key")
-        ),
+        "auth_required": bool(auth.get("required", True)),
+        "allow_registration": bool(auth.get("allow_registration", True)),
+        "bootstrap_key_file": str(auth.get("bootstrap_key_file", "data/keys/admin.key")),
         "config_dir": cfg_dir,
         "root": ROOT,
     }
+
+
+def session_id_of(conn, username: str) -> int:
+    row = conn.execute("SELECT id FROM api_keys WHERE name = ?",
+                       (f"session:{username.strip().lower()}",)).fetchone()
+    return row["id"] if row else 0
 
 
 # -- request models ---------------------------------------------------------
@@ -156,6 +166,21 @@ class ProvisionRequest(BaseModel):
     full_name: str = ""
 
 
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    full_name: str = ""
+    role: str = "viewer"
+
+
+class UserRoleRequest(BaseModel):
+    role: str
+
+
+class UserDisabledRequest(BaseModel):
+    disabled: bool
+
+
 class PushRequest(BaseModel):
     targets: list[str] | None = None
 
@@ -177,6 +202,8 @@ def create_app(config: dict | None = None) -> FastAPI:
         auth = config.get("auth") or {}
         if "required" in auth:
             cfg["auth_required"] = bool(auth["required"])
+        if "allow_registration" in auth:
+            cfg["allow_registration"] = bool(auth["allow_registration"])
         if "bootstrap_key_file" in auth:
             cfg["bootstrap_key_file"] = auth["bootstrap_key_file"]
     data_dir = cfg["root"] / "data"
@@ -392,6 +419,7 @@ def create_app(config: dict | None = None) -> FastAPI:
         return {
             "auth_required": bool(cfg["auth_required"]),
             "has_users": keys_mod.has_users(db.conn),
+            "allow_registration": bool(cfg["allow_registration"]) and bool(cfg["auth_required"]),
             "bootstrap_available": (
                 (cfg["root"] / cfg["bootstrap_key_file"]).is_file()
                 if cfg["auth_required"] else False
@@ -414,7 +442,8 @@ def create_app(config: dict | None = None) -> FastAPI:
         if username in ("admin", "root", "session", "api"):
             raise HTTPException(400, f"{username!r} is a reserved username")
         try:
-            keys_mod.create_user(db.conn, username, body.password, body.full_name)
+            keys_mod.create_user(db.conn, username, body.password, body.full_name,
+                                 role="admin")
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         try:
@@ -425,7 +454,7 @@ def create_app(config: dict | None = None) -> FastAPI:
 
     @app.post("/api/v1/auth/login")
     def login(body: LoginRequest) -> dict:
-        """Normal username/password login; issues an admin-scoped session key."""
+        """Normal username/password login; issues a session key scoped to the role."""
         if not cfg["auth_required"]:
             raise HTTPException(400, "auth is disabled")
         user = keys_mod.auth_user(db.conn, body.username, body.password)
@@ -434,7 +463,8 @@ def create_app(config: dict | None = None) -> FastAPI:
                 401, "invalid username or password", headers={"WWW-Authenticate": "Bearer"}
             )
         plain = keys_mod.create_session_key(db.conn, user["username"])
-        return {"name": f"session:{user['username']}", "key": plain, "username": user["username"]}
+        return {"name": f"session:{user['username']}", "key": plain,
+                "username": user["username"], "role": user.get("role", "viewer")}
 
     @app.post("/api/v1/auth/logout")
     def logout(key: dict = Depends(require("read"))) -> dict:
@@ -448,12 +478,18 @@ def create_app(config: dict | None = None) -> FastAPI:
     @app.get("/api/v1/auth/me")
     def me(key: dict = Depends(require("read"))) -> dict:
         username = ""
+        role = ""
         if key and str(key.get("name", "")).startswith("session:"):
             username = key["name"][len("session:"):]
+            row = db.conn.execute("SELECT role, disabled FROM users WHERE username = ?",
+                                  (username,)).fetchone()
+            if row is not None:
+                role = row["role"]
         return {
             "name": (key or {}).get("name", ""),
             "scopes": [s for s in ((key or {}).get("scopes") or "").split(",") if s],
             "username": username,
+            "role": role,
             "method": "session" if username else "api_key",
         }
 
@@ -477,6 +513,75 @@ def create_app(config: dict | None = None) -> FastAPI:
         if keys_mod.verify_key(db.conn, plain) is None:
             raise HTTPException(500, "bootstrap key file did not verify")
         return {"name": "admin", "key": plain}
+
+    # -- registration / user management -----------------------------------
+    @app.post("/api/v1/auth/register")
+    def register(body: RegisterRequest) -> dict:
+        """Self-service account registration.
+
+        A registrant picks their own role, but only from the non-privileged
+        set (viewer/analyst). "admin" can never be self-assigned here — an
+        existing admin must grant it via PUT /api/v1/users/{id}/role.
+        """
+        if not cfg["auth_required"]:
+            raise HTTPException(400, "auth is disabled")
+        if not cfg["allow_registration"]:
+            raise HTTPException(403, "registration is disabled by the administrator")
+        # First account behaves like the old bootstrap flow (full admin).
+        first = not keys_mod.has_users(db.conn)
+        allowed = keys_mod.ROLES if first else keys_mod.SELF_REGISTER_ROLES
+        username = body.username.strip().lower()
+        if username in RESERVED_USERNAMES:
+            raise HTTPException(400, f"{username!r} is a reserved username")
+        try:
+            user = keys_mod.create_user(
+                db.conn, username, body.password, body.full_name,
+                role="admin" if first else body.role,
+                allowed_roles=allowed,
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        key = keys_mod.create_session_key(db.conn, username)
+        return {"ok": True, "username": user["username"], "role": user["role"],
+                "key": key, "first_user": first}
+
+    @app.get("/api/v1/users")
+    def list_users(_: dict = Depends(require("admin"))) -> dict:
+        """List dashboard accounts (admin only)."""
+        return {"users": keys_mod.list_users(db.conn),
+                "roles": [{"role": r, "label": keys_mod.ROLE_LABELS[r],
+                           "scopes": keys_mod.ROLE_SCOPES[r]}
+                          for r in keys_mod.ROLES]}
+
+    @app.put("/api/v1/users/{user_id}/role")
+    def set_role(user_id: int, body: UserRoleRequest, _: dict = Depends(require("admin"))) -> dict:
+        """Change a user's role (admin only). The last admin cannot be demoted."""
+        target = next((u for u in keys_mod.list_users(db.conn) if u["id"] == user_id), None)
+        if target is None:
+            raise HTTPException(404, "user not found")
+        if target["role"] == "admin" and body.role != "admin" and \
+                keys_mod.user_count(db.conn, "admin") <= 1:
+            raise HTTPException(409, "cannot demote the last remaining admin")
+        try:
+            updated = keys_mod.set_user_role(db.conn, user_id, body.role)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return {"ok": True, "user": updated}
+
+    @app.put("/api/v1/users/{user_id}/disabled")
+    def set_disabled(user_id: int, body: UserDisabledRequest,
+                     _: dict = Depends(require("admin"))) -> dict:
+        """Enable/disable an account (admin only)."""
+        target = next((u for u in keys_mod.list_users(db.conn) if u["id"] == user_id), None)
+        if target is None:
+            raise HTTPException(404, "user not found")
+        if body.disabled and target["role"] == "admin" and \
+                keys_mod.user_count(db.conn, "admin") <= 1:
+            raise HTTPException(409, "cannot disable the last remaining admin")
+        keys_mod.set_user_disabled(db.conn, user_id, body.disabled)
+        if body.disabled:
+            keys_mod.revoke_session(db.conn, session_id_of(db.conn, target["username"]))
+        return {"ok": True}
 
     @app.get("/api/v1/stats")
     def stats(_: dict = Depends(require("read"))) -> dict:

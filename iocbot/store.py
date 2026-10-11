@@ -108,6 +108,8 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     full_name TEXT DEFAULT '',
+    role TEXT NOT NULL DEFAULT 'viewer',
+    disabled INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT '',
     last_login_at TEXT DEFAULT ''
 );
@@ -209,6 +211,8 @@ def _ensure_columns(conn: sqlite3.Connection) -> None:
         ("api_keys", "uses", "INTEGER DEFAULT 0"),
         ("api_keys", "last_ip", "TEXT DEFAULT ''"),
         ("api_keys", "platform", "TEXT DEFAULT ''"),
+        ("users", "role", "TEXT NOT NULL DEFAULT 'viewer'"),
+        ("users", "disabled", "INTEGER NOT NULL DEFAULT 0"),
     ):
         cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
         if name not in cols:
@@ -242,6 +246,19 @@ def _backfill_flags(conn: sqlite3.Connection) -> None:
 
 
 def _backfill_locked(conn: sqlite3.Connection) -> None:
+    # One-time role migration. Accounts that predate roles were effectively full
+    # admins (session keys used to be hardcoded admin,write,read), so upgrade
+    # them to admin instead of silently downgrading a live operator. Guarded by
+    # a sentinel so accounts created *after* the migration keep their role.
+    if not _flagged(conn, "roles_backfilled"):
+        n = conn.execute(
+            "UPDATE users SET role = 'admin' WHERE role = 'viewer'").rowcount
+        if n:
+            log.info("upgraded %d pre-existing user(s) to admin role", n)
+        conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES ('roles_backfilled', ?)",
+            (datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),),
+        )
     total = conn.execute("SELECT COUNT(*) FROM iocs").fetchone()[0]
     if not total:
         return
