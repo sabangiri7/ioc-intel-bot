@@ -175,6 +175,27 @@ artifact.
 
 ---
 
+## Secret safety (pre-commit hook)
+
+The repo ships a pre-commit secret scanner at `.githooks/pre-commit`, enabled via
+`core.hooksPath` (already set in this clone). Before each commit it scans staged
+files for real-looking credentials — PEM private keys, GitHub/Slack/AWS/Google
+tokens, JWTs, this project's own `iok_…` keys, and high-entropy
+`token`/`secret`/`password`/`api_key` assignments — and blocks the commit if it
+finds one.
+
+Documented placeholders (`CHANGE_ME`, `your_key`, `<…>`, `xxx`, `example`,
+`redacted`) are deliberately ignored, so the normal codebase — which mentions
+"token", "api_key", and "password" throughout its source and docs — commits
+cleanly without false positives.
+
+```bash
+git config core.hooksPath .githooks   # enable (already set here)
+git commit --no-verify                # emergency bypass (only if certain)
+```
+
+Runtime state (`data/`) and exports (`output/`) are gitignored and never staged.
+
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |
