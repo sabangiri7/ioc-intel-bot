@@ -81,6 +81,13 @@ Thumbs.db
 *.swo
 *~
 
+# ---------- Frontend build (Vite / React) ----------
+# dependencies and build output are reproducible from package-lock.json
+iocbot/web/node_modules/
+iocbot/web/dist/
+iocbot/web/.vite/
+*.tsbuildinfo
+
 # Third-party agent skills installed locally via `npx skills add` (184K,
 # not part of the project source).
 .agents/

@@ -879,12 +879,18 @@ def create_app(config: dict | None = None) -> FastAPI:
         return {"started": True}
 
     # -- dashboard ----------------------------------------------------------
-    if WEB_DIR.is_dir():
-        app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
+    # The dashboard is a Vite + React build (see iocbot/web/). In production we
+    # serve `web/dist`; during `npm run dev` the Vite dev server proxies /api
+    # here instead, so both paths hit the same backend.
+    dist = WEB_DIR / "dist"
+    web_root = dist if (dist / "index.html").is_file() else WEB_DIR
+
+    if web_root.is_dir():
+        app.mount("/static", StaticFiles(directory=str(web_root)), name="static")
 
         @app.get("/", include_in_schema=False)
         def index():
-            return FileResponse(WEB_DIR / "index.html")
+            return FileResponse(web_root / "index.html")
 
     return app
 
