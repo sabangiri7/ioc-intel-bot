@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""Pre-commit guard: block commits that stage files with likely real secrets.
+
+The repository intentionally contains the *words* "token", "api_key",
+"password", "iok_", and "Authorization" throughout its source, config, and
+docs. This hook therefore does NOT flag those words on their own -- it flags
+only assignments that carry a plausible *real* credential value, so the codebase
+can be committed normally while an accidental live key/pem is stopped.
+
+Exit codes: 0 = clean (commit proceeds), 1 = secrets detected (commit blocked).
+"""
+from __future__ import annotations
+
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+# Text files to inspect (binary and lock-heavy files are skipped).
+SCAN_SUFFIXES = {
+    ".py", ".yaml", ".yml", ".json", ".toml", ".ini", ".cfg", ".env", ".txt",
+    ".md", ".js", ".css", ".html", ".sh", ".service", ".timer", ".conf",
+}
+SKIP_DIRS = {".git", "node_modules", "__pycache__", ".pytest_cache", ".agents",
+             "data", "output", ".venv", "venv", "dist", "build"}
+
+# Placeholder markers that mean "this is not a real secret".
+PLACEHOLDER = re.compile(
+    r"(?i)(change_me|changeme|your[-_ ]?\w+|xxx+|\.\.\.|<[^>]*>|\{\{.*\}\}|"
+    r"placeholder|example\.com|redacted|dummy|sample|notreal|fake|test[-_ ]?\w*|"
+    r"locallyscript|demo|foo|bar|\bTODO\b|\bFIXME\b|insert|replace)"
+)
+
+# Real-looking credentials. Each rule targets an assignment/prefix shape.
+SECRET_RULES = [
+    # PEM private keys -- always a hard stop, no placeholder bypass.
+    ("private-key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
+    # OpenSSH private keys.
+    ("private-key", re.compile(r"-----BEGIN OPENSSH PRIVATE KEY-----")),
+    # GitHub personal access / app tokens.
+    ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b")),
+    # GitHub fine-grained PAT.
+    ("github-token", re.compile(r"\bgithub_pat_[A-Za-z0-9_]{50,}\b")),
+    # Slack tokens.
+    ("slack-token", re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b")),
+    # AWS access key IDs.
+    ("aws-access-key", re.compile(r"\b(AKIA|ASIA)[0-9A-Z]{16}\b")),
+    # Google API keys.
+    ("google-api-key", re.compile(r"\bAIza[0-9A-Za-z\-_]{35}\b")),
+    # This project's own API keys: iok_ + 40 hex chars (KEY_PREFIX + token_hex(20)).
+    ("iocbot-api-key", re.compile(r"\biok_[0-9a-f]{40}\b", re.I)),
+    # JWT.
+    ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")),
+    # Credential assignments carrying a high-entropy literal.
+    ("assigned-secret", re.compile(
+        r"(?i)\b(?:api[_-]?key|apikey|secret[_-]?key|secret|token|password|passwd|"
+        r"access[_-]?key|private[_-]?key|auth[_-]?token|bearer)\b"
+        r"\s*[:=]\s*[\"']?"
+        r"(?P<val>[A-Za-z0-9/+_\-\.=]{16,})[\"']?"
+    )),
+]
+
+# Explicit assignment keys that expect a real value even if shorter.
+ASSIGN_KEYS = re.compile(
+    r"(?i)\b(?:api[_-]?key|apikey|secret[_-]?key|access[_-]?key|auth[_-]?token|"
+    r"password|passwd|bearer[_-]?token)\b"
+)
+
+
+def staged_files() -> list[str]:
+    """Files staged for commit (added/copied/modified/renamed), NUL-separated."""
+    out = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"],
+        capture_output=True, text=True, check=False,
+    ).stdout
+    return [p for p in out.split("\0") if p]
+
+
+def should_scan(path: str) -> bool:
+    p = Path(path)
+    if any(part in SKIP_DIRS for part in p.parts):
+        return False
+    return p.suffix.lower() in SCAN_SUFFIXES or p.name in {".env", "Dockerfile"}
+
+
+def line_of(text: str, index: int) -> int:
+    return text.count("\n", 0, index) + 1
+
+
+def find_secrets(path: str) -> list[tuple[int, str, str, str]]:
+    """Return [(line_no, rule, matched_snippet, note)] for one staged file."""
+    try:
+        blob = subprocess.run(["git", "show", f":{path}"],
+                              capture_output=True, check=False).stdout
+    except Exception:
+        return []
+    try:
+        text = blob.decode("utf-8")
+    except UnicodeDecodeError:
+        return []  # binary
+
+    hits = []
+    for rule_name, pattern in SECRET_RULES:
+        for m in pattern.finditer(text):
+            snippet = m.group(0)
+            # Private keys are never a placeholder.
+            if rule_name == "private-key":
+                hits.append((line_of(text, m.start()), rule_name, "<private key block>", ""))
+                continue
+            # For assignments, only the captured value is placeholder-checked.
+            val = m.groupdict().get("val")
+            probe = val if val is not None else snippet
+            if val is not None:
+                # value may carry a key name prefix from the assignment
+                probe = val.split("=")[-1]
+            if PLACEHOLDER.search(probe):
+                continue
+            # Generic assignment rule: require the value to look like a
+            # credential (mixed entropy), not a plain word or path.
+            if rule_name == "assigned-secret" and val is not None:
+                if not re.search(r"[A-Za-z]", probe) or not re.search(r"[0-9]", probe):
+                    continue
+                # skip obvious code identifiers / dotted modules
+                if re.search(r"\.[a-z_]+$", probe) and "/" not in probe:
+                    continue
+            hits.append((line_of(text, m.start()), rule_name, _redact(snippet), probe if val else ""))
+    return hits
+
+
+def _redact(s: str) -> str:
+    s = s.strip()
+    if len(s) <= 8:
+        return s
+    return s[:4] + "…" + s[-2:]
+
+
+def main() -> int:
+    files = [f for f in staged_files() if should_scan(f)]
+    findings = []
+    for path in files:
+        for line_no, rule, snippet, note in find_secrets(path):
+            findings.append((path, line_no, rule, snippet, note))
+
+    if not findings:
+        print(f"secret-scan: OK ({len(files)} staged file(s) checked)")
+        return 0
+
+    print("\n\033[91msecret-scan: BLOCKED — possible real secret(s) in staged files\033[0m\n")
+    for path, line_no, rule, snippet, note in findings:
+        extra = f"  value={note}" if note else ""
+        print(f"  {path}:{line_no}  [{rule}]  {snippet}{extra}")
+    print(
+        "\nIf this is a FALSE POSITIVE (a documented placeholder/example), do one of:\n"
+        "  * reword the value so it contains a placeholder marker\n"
+        "    (CHANGE_ME / your_key / <...> / xxx / example / redacted), or\n"
+        "  * commit with:  git commit --no-verify   (only if you are certain)\n"
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
