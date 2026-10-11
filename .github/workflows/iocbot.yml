@@ -1,0 +1,40 @@
+name: IOC Collection
+
+on:
+  schedule:
+    - cron: '0 12,16 * * *'  # 12:00 & 16:00 UTC
+  workflow_dispatch:
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run collection
+        run: |
+          python -m iocbot.cli >> data/logs/cron.log 2>&1 || true
+
+      - name: Upload outputs and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iocbot-daily-${{ github.run_id }}
+          path: |
+            output/
+            data/logs/
+            data/state.db
+          retention-days: 7
