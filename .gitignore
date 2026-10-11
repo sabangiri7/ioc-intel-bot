@@ -1,6 +1,17 @@
-# Python
+# ============================================================
+# IOC Intel Bot — .gitignore
+#
+# This repo is meant to hold SOURCE ONLY. The runtime state (data/) and
+# generated exports (output/) contain live threat-intelligence data, API-key
+# hashes, and a dashboard users table — none of which belongs in git, and the
+# database alone is hundreds of MB.
+# ============================================================
+
+# ---------- Python ----------
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
 *.egg-info/
 .eggs/
 build/
@@ -8,26 +19,69 @@ dist/
 .venv/
 venv/
 env/
+.python-version
 
-# Test / tooling caches
+# ---------- Test / tooling caches ----------
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.cache/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
+.tox/
 
-# Runtime state & secrets
+# ---------- Runtime state & secrets (NEVER commit) ----------
+# data/ holds: state.db (live IOC database + api_keys + users), keys/ (the
+# first-run bootstrap admin key), and cache/ (raw feed downloads).
 data/
-config/*.local.yaml
+
+# Bootstrap admin key and any other key material.
 *.key
+*.pem
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_ed25519
+*.keystore
+
+# Local config overrides may embed real SIEM push credentials.
+config/*.local.yaml
+config/*.local.yml
+config/local.yaml
+config/local.yml
+config/secrets.yaml
+config/secrets.yml
+
+# Environment / dotenv files.
 .env
+.env.*
+!.env.example
+*.env
 
-# Generated output
+# ---------- Generated output ----------
 output/
+*.csv
+*.stix.json
+IOC_SUMMARY.txt
 
-# OS / editor
+# ---------- Logs ----------
+*.log
+logs/
+npm-debug.log*
+
+# ---------- Agent / editor / OS ----------
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 *.swp
+*.swo
+*~
+
+# Third-party agent skills installed locally via `npx skills add` (184K,
+# not part of the project source).
+.agents/
+skills-lock.json
