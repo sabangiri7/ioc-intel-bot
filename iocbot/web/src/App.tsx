@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ShieldCheck,
-  MagnifyingGlass,
+  Search as MagnifyingGlass,
   Play,
-  Key,
-  SignOut,
+  KeyRound as Key,
+  LogOut as SignOut,
   Plus,
-  ArrowClockwise,
-  Columns,
-} from '@phosphor-icons/react'
+  RefreshCw as ArrowClockwise,
+  Columns3 as Columns,
+} from 'lucide-react'
 import {
   api,
   downloadUrl,

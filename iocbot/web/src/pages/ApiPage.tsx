@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Copy } from '@phosphor-icons/react'
+import { Copy } from 'lucide-react'
 import {
   api,
   getKey,

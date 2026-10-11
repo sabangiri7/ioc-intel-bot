@@ -55,10 +55,18 @@ SECRET_RULES = [
     ("assigned-secret", re.compile(
         r"(?i)\b(?:api[_-]?key|apikey|secret[_-]?key|secret|token|password|passwd|"
         r"access[_-]?key|private[_-]?key|auth[_-]?token|bearer)\b"
-        r"\s*[:=]\s*[\"']?"
-        r"(?P<val>[A-Za-z0-9/+_\-\.=]{16,})[\"']?"
+        r"[ \t]*[:=][^=\n]*?"
+        r"(?P<val>[A-Za-z0-9/+_\-\.=]{16,})"
     )),
 ]
+
+# Assignments whose value is code moving data around, not a literal secret.
+# `let apiKey = localStorage.getItem(...)`, `const token = await refresh()`.
+NOT_A_LITERAL = re.compile(
+    r"(\.\s*(getItem|getAttribute|fetch|json|text)\s*\()|(\bawait\b)|(\brequire\s*\()|"
+    r"(\bimport\b)|(\bprocess\.env\b)|(\blocalStorage\b)|(\bsessionStorage\b)|"
+    r"(\bdocument\.)|(\bwindow\.)"
+)
 
 # Explicit assignment keys that expect a real value even if shorter.
 ASSIGN_KEYS = re.compile(
@@ -122,6 +130,14 @@ def find_secrets(path: str) -> list[tuple[int, str, str, str]]:
                     continue
                 # skip obvious code identifiers / dotted modules
                 if re.search(r"\.[a-z_]+$", probe) and "/" not in probe:
+                    continue
+                # Skip assignments that just move data around rather than hold a
+                # literal secret, e.g. `let apiKey = localStorage.getItem(...)`
+                # or `const token = await refreshToken()`. A real credential is
+                # a quoted or bare literal, not the result of a call.
+                if re.search(r"[A-Za-z_$][\w.$]*\s*\(", probe) or re.search(
+                    r"\b(getItem|fetch|json|env|process|import|require)\b", probe
+                ):
                     continue
             hits.append((line_of(text, m.start()), rule_name, _redact(snippet), probe if val else ""))
     return hits

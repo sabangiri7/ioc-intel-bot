@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ShieldCheck, Key, UserPlus } from '@phosphor-icons/react'
+import { ShieldCheck, KeyRound as KeyRound, UserPlus } from 'lucide-react'
 import { api, setKey, type Role } from '../lib/api'
 import { Button, ErrorText } from '../lib/ui'
 
@@ -136,7 +136,7 @@ export default function Login({ onSignedIn }: { onSignedIn: () => void }) {
       <div className="relative mx-auto grid min-h-full max-w-[1120px] grid-cols-[minmax(0,1.05fr)_minmax(360px,460px)] items-center gap-10 px-7 py-12 max-md:grid-cols-1 max-md:gap-8">
         <section className="max-w-[560px] max-md:justify-self-stretch">
           <div className="flex items-center gap-2">
-            <ShieldCheck size={22} className="flex-none text-accent" weight="regular" />
+            <ShieldCheck size={16} strokeWidth={1.5} className="flex-none text-accent" />
             <div>
               <strong className="text-[14px] font-bold tracking-[0.14em]">IOC&nbsp;INTEL</strong>
               <p className="mt-0.5 text-dim">Threat-intelligence command center</p>
@@ -334,7 +334,7 @@ export default function Login({ onSignedIn }: { onSignedIn: () => void }) {
                           'Back to sign in'
                         ) : (
                           <span className="inline-flex items-center justify-center gap-1.5">
-                            <UserPlus size={14} /> Create an account
+                            <UserPlus size={16} strokeWidth={1.5} /> Create an account
                           </span>
                         )}
                       </button>
@@ -345,7 +345,7 @@ export default function Login({ onSignedIn }: { onSignedIn: () => void }) {
                       className="flex-1 cursor-pointer rounded-ctl border border-line2 bg-transparent py-1.5 text-dim transition-colors hover:border-accent hover:bg-bg4 hover:text-text"
                     >
                       <span className="inline-flex items-center justify-center gap-1.5">
-                        <Key size={14} /> Use an API key
+                        <KeyRound size={14} /> Use an API key
                       </span>
                     </button>
                   </div>
