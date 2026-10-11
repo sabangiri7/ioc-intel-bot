@@ -223,6 +223,10 @@ rewrite. If it finds a real credential, rotate it immediately and purge the blob
 | Push only sends the newest N rows | `batch_limit` caps each push (newest first). Lower `min_severity` or raise `batch_limit` for backfill. |
 | A family folder looks stale | Auto folders are created, never garbage-collected; they persist after a family stops appearing. |
 | Dashboard won't bind | Another process holds the port; change `--port`. |
+| `/` shows "dashboard has not been built" (503) | `iocbot/web/dist` is missing. Run `cd iocbot/web && npm ci && npm run build`, then restart the API server. |
+| UI looks stale after a `git pull` | The dashboard is a build artifact and is not committed. Re-run `npm run build` in `iocbot/web/`. |
+| `npm run dev` shows no data | The backend is not running on `127.0.0.1:8080`; Vite proxies `/api` there. Start `iocbot.api.server` in another terminal. |
 
-See [API.md](API.md) for endpoint-level behavior and [CONFIGURATION.md](CONFIGURATION.md)
-for every config key.
+See [API.md](API.md) for endpoint-level behavior, [CONFIGURATION.md](CONFIGURATION.md)
+for every config key, and [ARCHITECTURE.md](ARCHITECTURE.md) for the front-end
+module map.

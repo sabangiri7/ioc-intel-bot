@@ -23,7 +23,13 @@ from pathlib import Path
 import yaml
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -879,20 +885,57 @@ def create_app(config: dict | None = None) -> FastAPI:
         return {"started": True}
 
     # -- dashboard ----------------------------------------------------------
-    # The dashboard is a Vite + React build (see iocbot/web/). In production we
-    # serve `web/dist`; during `npm run dev` the Vite dev server proxies /api
-    # here instead, so both paths hit the same backend.
+    # The dashboard is a Vite + React app (see iocbot/web/). We serve the built
+    # output from `web/dist`. During `npm run dev` the Vite dev server proxies
+    # /api here instead, so both paths hit the same backend.
     dist = WEB_DIR / "dist"
-    web_root = dist if (dist / "index.html").is_file() else WEB_DIR
 
-    if web_root.is_dir():
-        app.mount("/static", StaticFiles(directory=str(web_root)), name="static")
+    if (dist / "index.html").is_file():
+        app.mount("/static", StaticFiles(directory=str(dist)), name="static")
 
         @app.get("/", include_in_schema=False)
         def index():
-            return FileResponse(web_root / "index.html")
+            return FileResponse(dist / "index.html")
+
+    else:
+        # No build present. Serving web/index.html would hand the browser
+        # uncompiled TypeScript and render a blank page with no clue why, so
+        # return the actual fix instead.
+        log.warning("dashboard build missing at %s", dist)
+
+        @app.get("/", include_in_schema=False)
+        def index():
+            return HTMLResponse(_NOT_BUILT, status_code=503)
+
+        @app.get("/static/{path:path}", include_in_schema=False)
+        def static_missing(path: str):
+            raise HTTPException(503, "dashboard build missing; run: npm run build")
 
     return app
+
+
+_NOT_BUILT = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Dashboard not built</title>
+<style>
+ body{background:#0B0F14;color:#E6EDF5;font:14px/1.6 system-ui,sans-serif;
+      display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
+ .box{max-width:640px;padding:32px}
+ h1{font-size:20px;margin:0 0 12px}
+ code{background:#18212D;border:1px solid #2A3748;border-radius:6px;padding:2px 6px;
+      font-family:ui-monospace,monospace;font-size:13px}
+ pre{background:#121922;border:1px solid #2A3748;border-radius:8px;padding:14px;
+     overflow-x:auto;font-family:ui-monospace,monospace;font-size:13px;color:#94A2B3}
+ .muted{color:#7D8CA0}
+</style></head>
+<body><div class="box">
+<h1>The dashboard has not been built yet</h1>
+<p>The UI is a Vite + React app. Build it once (and again after pulling changes):</p>
+<pre><code>cd iocbot/web
+npm install      # or: npm ci
+npm run build</code></pre>
+<p class="muted">Then restart the API server. During development you can instead run
+<code>npm run dev</code> for hot reload (it proxies <code>/api</code> to this server on port 8080).</p>
+</div></body></html>"""
 
 
 def _stix_time(value: str | None) -> str | None:

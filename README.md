@@ -37,14 +37,45 @@ system built for that, after review.
 
 ## Requirements
 
-Python ≥ 3.10.
+- **Python** ≥ 3.10
+- **Node.js** ≥ 20 (only to build the dashboard; Vite 8 needs a modern runtime)
+
+## Install
 
 ```bash
+git clone <your-repo-url> ioc-intel-bot
+cd ioc-intel-bot
+
+# 1. Backend
 pip install -r requirements.txt
+
+# 2. Dashboard (Vite + React) — build once, and again after pulling UI changes
+cd iocbot/web
+npm ci          # or: npm install
+npm run build   # type-check + emit dist/, which FastAPI serves
+cd ../..
 ```
 
-- **Collector:** `requests beautifulsoup4 lxml feedparser tldextract PyYAML`
-- **API + dashboard:** `fastapi uvicorn pydantic`
+Then start the server:
+
+```bash
+python3 -m iocbot.api.server          # API + dashboard on http://127.0.0.1:8080
+```
+
+If you skip the dashboard build, the server still runs but `/` returns a page
+telling you to run `npm run build`.
+
+### Front-end development
+
+For hot reload, run the API and the Vite dev server side by side. Vite proxies
+`/api` to the backend, so there is no CORS setup:
+
+```bash
+# terminal 1
+python3 -m iocbot.api.server --host 127.0.0.1 --port 8080
+# terminal 2
+cd iocbot/web && npm run dev        # http://localhost:5173
+```
 
 ## Run
 
@@ -71,6 +102,7 @@ complete flag reference.
 | **[docs/SOURCES.md](docs/SOURCES.md)** | All 28 configured sources by tier, MITRE enrichment |
 | **[docs/API.md](docs/API.md)** | Full SIEM pull-API + dashboard endpoint reference |
 | **[docs/OPERATIONS.md](docs/OPERATIONS.md)** | Running, scheduling, key/user lifecycle, troubleshooting |
+| **[iocbot/web/README.md](iocbot/web/README.md)** | Front end (Vite + React): dev server, build, module map |
 
 ## Outputs — daily, dated (`output/daily/YYYY-MM-DD/`)
 
