@@ -55,8 +55,10 @@ SECRET_RULES = [
     ("assigned-secret", re.compile(
         r"(?i)\b(?:api[_-]?key|apikey|secret[_-]?key|secret|token|password|passwd|"
         r"access[_-]?key|private[_-]?key|auth[_-]?token|bearer)\b"
-        r"[ \t]*[:=][^=\n]*?"
-        r"(?P<val>[A-Za-z0-9/+_\-\.=]{16,})"
+        # The value is either a quoted string or a bare token. Do NOT allow the
+        # match to run past the value: that made `X-API-Key: iok_..." <url>` in
+        # the docs match on the URL.
+        r"[ \t]*[:=][ \t]*(?:\"[ \t]*(?P<qval>[^\"\n]{12,})\"|'(?P<sval>[^'\n]{12,})'|(?P<val>[A-Za-z0-9/+_\-\.=]{16,}))"
     )),
 ]
 
@@ -95,6 +97,37 @@ def line_of(text: str, index: int) -> int:
     return text.count("\n", 0, index) + 1
 
 
+def detect(text: str) -> list[tuple[str, re.Pattern, str]]:
+    """Return [(rule_name, pattern, matched_snippet)] for all secret hits.
+
+    Single source of truth for detection. Both the pre-commit hook and the
+    history scanner call this so their verdicts can never diverge.
+    """
+    out: list[tuple[str, re.Pattern, str]] = []
+    for rule_name, pattern in SECRET_RULES:
+        for m in pattern.finditer(text):
+            snippet = m.group(0)
+            if rule_name == "private-key":
+                out.append((rule_name, pattern, snippet))
+                continue
+            val = (m.groupdict().get("val") or m.groupdict().get("qval")
+                   or m.groupdict().get("sval"))
+            probe = val.split("=")[-1] if val is not None else snippet
+            if PLACEHOLDER.search(probe):
+                continue
+            if rule_name == "assigned-secret" and val is not None:
+                if not re.search(r"[A-Za-z]", probe) or not re.search(r"[0-9]", probe):
+                    continue
+                if re.search(r"\.[a-z_]+$", probe) and "/" not in probe:
+                    continue
+                # Values that are the result of a call or a storage lookup are
+                # not literal credentials, e.g. `localStorage.getItem(...)`.
+                if NOT_A_LITERAL.search(snippet):
+                    continue
+            out.append((rule_name, pattern, snippet))
+    return out
+
+
 def find_secrets(path: str) -> list[tuple[int, str, str, str]]:
     """Return [(line_no, rule, matched_snippet, note)] for one staged file."""
     try:
@@ -108,37 +141,13 @@ def find_secrets(path: str) -> list[tuple[int, str, str, str]]:
         return []  # binary
 
     hits = []
-    for rule_name, pattern in SECRET_RULES:
-        for m in pattern.finditer(text):
-            snippet = m.group(0)
-            # Private keys are never a placeholder.
-            if rule_name == "private-key":
-                hits.append((line_of(text, m.start()), rule_name, "<private key block>", ""))
-                continue
-            # For assignments, only the captured value is placeholder-checked.
-            val = m.groupdict().get("val")
-            probe = val if val is not None else snippet
-            if val is not None:
-                # value may carry a key name prefix from the assignment
-                probe = val.split("=")[-1]
-            if PLACEHOLDER.search(probe):
-                continue
-            # Generic assignment rule: require the value to look like a
-            # credential (mixed entropy), not a plain word or path.
-            if rule_name == "assigned-secret" and val is not None:
-                if not re.search(r"[A-Za-z]", probe) or not re.search(r"[0-9]", probe):
-                    continue
-                # skip obvious code identifiers / dotted modules
-                if re.search(r"\.[a-z_]+$", probe) and "/" not in probe:
-                    continue
-                # Skip assignments that just move data around rather than hold
-                # a literal secret, e.g. `let apiKey = localStorage.getItem(...)`
-                # or `const token = await refresh()`. Check the whole matched
-                # span, not just the captured value, because the call usually
-                # sits outside the captured characters.
-                if NOT_A_LITERAL.search(snippet):
-                    continue
-            hits.append((line_of(text, m.start()), rule_name, _redact(snippet), probe if val else ""))
+    for rule_name, _pattern, snippet in detect(text):
+        if rule_name == "private-key":
+            hits.append((line_of(text, text.find(snippet)), rule_name,
+                         "<private key block>", ""))
+            continue
+        hits.append((line_of(text, text.find(snippet)), rule_name,
+                     _redact(snippet), ""))
     return hits
 
 

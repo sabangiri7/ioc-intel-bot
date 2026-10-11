@@ -53,18 +53,13 @@ def main() -> int:
             text = blob.decode("utf-8")
         except UnicodeDecodeError:
             continue
-        for rule, pattern in pc.SECRET_RULES:
-            for m in pattern.finditer(text):
-                val = m.groupdict().get("val")
-                probe = val.split("=")[-1] if val else m.group(0)
-                if rule != "private-key" and pc.PLACEHOLDER.search(probe):
-                    continue
-                ln = text.count("\n", 0, m.start()) + 1
-                # Ignore the scanner's own detection regex (self-match): only
-                # when the hit is inside the pre-commit hook's source itself.
-                if rule == "private-key" and path.endswith(HOOK.name):
-                    continue
-                findings.append((path, sha[:8], ln, rule, m.group(0)))
+        # Reuse the hook's detection rules so history and staged-file scans
+        # can never drift apart. Mirror only the self-match suppression.
+        for rule, _pat, snippet in pc.detect(text):
+            if rule == "private-key" and path.endswith(HOOK.name):
+                continue  # the hook contains the detection regex itself
+            ln = text.count("\n", 0, text.find(snippet)) + 1
+            findings.append((path, sha[:8], ln, rule, snippet))
 
     print(f"scanned {len(blobs)} unique blobs across all history")
     if not findings:
