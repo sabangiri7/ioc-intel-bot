@@ -23,8 +23,9 @@ import {
 import { Button, ErrorText, Toast, num } from './lib/ui'
 import Login from './pages/Login'
 import ApiPage from './pages/ApiPage'
+import FolderManager from './pages/FolderManager'
 import IocTable, { COLUMNS, rowKey } from './components/IocTable'
-import Drawer, { NewIocModal } from './components/Drawer'
+import Drawer, { NewIocModal } from './components/drawer/Drawer'
 
 type ViewKey = 'all' | 'recent' | 'critical' | 'importable' | 'review' | 'c2' | 'malware'
 
@@ -55,7 +56,7 @@ const EXPORT_LIMIT = 5000
 
 export default function App() {
   const [authed, setAuthed] = useState(Boolean(getKey()))
-  const [page, setPage] = useState<'iocs' | 'api'>('iocs')
+  const [page, setPage] = useState<'iocs' | 'folders' | 'api'>('iocs')
   const [stats, setStats] = useState<Stats | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [rows, setRows] = useState<Ioc[]>([])
@@ -81,6 +82,7 @@ export default function App() {
   const [showNew, setShowNew] = useState(false)
   const [showColumns, setShowColumns] = useState(false)
   const [search, setSearch] = useState('')
+  const [folderSearch, setFolderSearch] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
   const notify = useCallback((message: string, error?: boolean) => {
@@ -348,6 +350,11 @@ export default function App() {
               <Play size={14} /> Run
             </span>
           </Button>
+          <Button onClick={() => setPage('folders')} title="Manage threat folders">
+            <span className="inline-flex items-center gap-1">
+              <ShieldCheck size={14} /> Folders
+            </span>
+          </Button>
           <Button onClick={() => setPage('api')} title="API keys and integrations">
             <span className="inline-flex items-center gap-1">
               <Key size={14} /> Keys
@@ -439,31 +446,88 @@ export default function App() {
               type="search"
               placeholder="filter folders..."
               aria-label="Filter folders"
+              value={folderSearch}
+              onChange={(e) => setFolderSearch(e.target.value)}
             />
-            <div className="max-h-[46vh] overflow-y-auto">
-              {folders.slice(0, 200).map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => {
-                    setFolder(folder?.id === f.id ? null : f)
-                    setOffset(0)
-                  }}
-                  className={`flex w-full cursor-pointer items-center justify-between rounded-[6px] px-2 py-1 text-left text-[12px] transition-colors ${
-                    folder?.id === f.id ? 'bg-bg4 text-text' : 'text-dim hover:bg-bg3'
-                  }`}
-                  title={f.description || f.name}
-                >
-                  <span className="truncate">{f.name}</span>
-                  <span className="font-mono text-[11px] text-faint">{num(f.count)}</span>
-                </button>
-              ))}
-              {folders.length === 0 && <p className="px-2 text-[12px] text-faint">no folders yet</p>}
-            </div>
+            {(() => {
+              const q = folderSearch.trim().toLowerCase()
+              const filtered = q
+                ? folders.filter((f) => f.name.toLowerCase().includes(q))
+                : folders
+              const autoFolders = filtered.filter((f) => f.kind === 'auto')
+              const manualFolders = filtered.filter((f) => f.kind === 'manual')
+              return (
+                <div className="max-h-[46vh] overflow-y-auto">
+                  {autoFolders.length > 0 && (
+                    <div className="mb-1.5">
+                      <div className="mb-1 flex items-center gap-1.5 px-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-faint">
+                          Auto
+                        </span>
+                        <span className="font-mono text-[10px] text-faint">{num(autoFolders.length)}</span>
+                      </div>
+                      {autoFolders.map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => {
+                            setFolder(folder?.id === f.id ? null : f)
+                            setOffset(0)
+                          }}
+                          className={`flex w-full cursor-pointer items-center justify-between rounded-[6px] px-2 py-1 text-left text-[12px] transition-colors ${
+                            folder?.id === f.id ? 'bg-bg4 text-text' : 'text-dim hover:bg-bg3'
+                          }`}
+                          title={f.description || f.name}
+                        >
+                          <span className="truncate">{f.name}</span>
+                          <span className="font-mono text-[11px] text-faint">{num(f.count)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {manualFolders.length > 0 && (
+                    <div className="mb-1.5">
+                      <div className="mb-1 flex items-center gap-1.5 px-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-faint">
+                          Manual
+                        </span>
+                        <span className="font-mono text-[10px] text-faint">{num(manualFolders.length)}</span>
+                      </div>
+                      {manualFolders.map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => {
+                            setFolder(folder?.id === f.id ? null : f)
+                            setOffset(0)
+                          }}
+                          className={`flex w-full cursor-pointer items-center justify-between rounded-[6px] px-2 py-1 text-left text-[12px] transition-colors ${
+                            folder?.id === f.id ? 'bg-bg4 text-text' : 'text-dim hover:bg-bg3'
+                          }`}
+                          title={f.description || f.name}
+                        >
+                          <span className="truncate">{f.name}</span>
+                          <span className="font-mono text-[11px] text-faint">{num(f.count)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {filtered.length === 0 && (
+                    <p className="px-2 text-[12px] text-faint">
+                      {q ? 'no folders match' : 'no folders yet'}
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         </aside>
 
         <main className="min-w-0 flex-1 overflow-y-auto">
-          {page === 'api' ? (
+          {page === 'folders' ? (
+            <div className="p-4">
+              <div className="mb-1 text-[12px] text-faint">Intelligence / Threat Folders</div>
+              <FolderManager notify={notify} />
+            </div>
+          ) : page === 'api' ? (
             <div className="p-4">
               <div className="mb-1 text-[12px] text-faint">Intelligence / API and Integrations</div>
               <h1 className="text-[22px] font-semibold">API &amp; Integrations</h1>

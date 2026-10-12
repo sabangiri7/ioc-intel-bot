@@ -4,7 +4,7 @@ import { Toaster } from 'sonner'
 import { TooltipProvider } from './components/ui'
 import './index.css'
 import App from './App'
-import Kitchen from './pages/Kitchen'
+import Kitchen from './pages/dev/Kitchen'
 
 /**
  * Phase 1 adds a kitchen-sink route behind a hash so the existing app shell

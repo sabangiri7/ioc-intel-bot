@@ -72,6 +72,7 @@ export interface Folder {
   color: string
   created_at: string
   count?: number
+  group?: 'malware' | 'actor' | 'manual'
 }
 
 export interface ApiKey {
