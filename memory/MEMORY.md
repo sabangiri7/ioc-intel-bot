@@ -1,0 +1,6 @@
+- [Project Overview](ioc-intel-bot-project-overview.md) — IOC Intel Bot: threat-indicator collection tool for C2/malware IOCs from public sources; manual-review export only
+- [Tech Stack](ioc-intel-bot-tech-stack.md) — Python 3.10+/SQLite/FastAPI backend; Vite 8/React 19/TypeScript/Tailwind v4 frontend; pytest; GitHub Actions
+- [Pipeline Architecture](ioc-intel-bot-pipeline-architecture.md) — Pipeline.run() orchestrator; SQLite as single source of truth; four output consumers (CSV, API, push, summary)
+- [Tier System](ioc-intel-bot-tier-system.md) — Three-tier evidence model (A=structured feeds, B=reports, C=blocklists) plus MITRE enrichment
+- [Safety Constraints](ioc-intel-bot-safety-constraints.md) — Read-only design: no response actions, no Falcon API calls, no DNS resolution, pre-commit secret scanner
+- [Run Skill Status](ioc-intel-bot-run-skill.md) — /run-ioc-intel-bot skill created; skill dir pending at .claude/skills/run-ioc-intel-bot/
