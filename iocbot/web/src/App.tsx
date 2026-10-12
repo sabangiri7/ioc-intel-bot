@@ -26,6 +26,7 @@ import ApiPage from './pages/ApiPage'
 import FolderManager from './pages/FolderManager'
 import IocTable, { COLUMNS, rowKey } from './components/IocTable'
 import Drawer, { NewIocModal } from './components/drawer/Drawer'
+import FolderNav from './components/FolderNav'
 
 type ViewKey = 'all' | 'recent' | 'critical' | 'importable' | 'review' | 'c2' | 'malware'
 
@@ -82,7 +83,6 @@ export default function App() {
   const [showNew, setShowNew] = useState(false)
   const [showColumns, setShowColumns] = useState(false)
   const [search, setSearch] = useState('')
-  const [folderSearch, setFolderSearch] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
   const notify = useCallback((message: string, error?: boolean) => {
@@ -435,89 +435,20 @@ export default function App() {
           </div>
 
           <div className="min-h-0 flex-1 px-3 py-2.5">
-            <div className="mb-1.5 flex items-center justify-between">
+            <div className="mb-2 flex items-center justify-between">
               <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint">
                 Threat Folders
               </span>
               <span className="font-mono text-[11px] text-faint">{num(folders.length)}</span>
             </div>
-            <input
-              className="ctl mb-2 w-full py-1 text-[12px]"
-              type="search"
-              placeholder="filter folders..."
-              aria-label="Filter folders"
-              value={folderSearch}
-              onChange={(e) => setFolderSearch(e.target.value)}
+            <FolderNav
+              folders={folders}
+              activeFolder={folder}
+              onSelectFolder={(f) => {
+                setFolder(f)
+                setOffset(0)
+              }}
             />
-            {(() => {
-              const q = folderSearch.trim().toLowerCase()
-              const filtered = q
-                ? folders.filter((f) => f.name.toLowerCase().includes(q))
-                : folders
-              const autoFolders = filtered.filter((f) => f.kind === 'auto')
-              const manualFolders = filtered.filter((f) => f.kind === 'manual')
-              return (
-                <div className="max-h-[46vh] overflow-y-auto">
-                  {autoFolders.length > 0 && (
-                    <div className="mb-1.5">
-                      <div className="mb-1 flex items-center gap-1.5 px-1">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-faint">
-                          Auto
-                        </span>
-                        <span className="font-mono text-[10px] text-faint">{num(autoFolders.length)}</span>
-                      </div>
-                      {autoFolders.map((f) => (
-                        <button
-                          key={f.id}
-                          onClick={() => {
-                            setFolder(folder?.id === f.id ? null : f)
-                            setOffset(0)
-                          }}
-                          className={`flex w-full cursor-pointer items-center justify-between rounded-[6px] px-2 py-1 text-left text-[12px] transition-colors ${
-                            folder?.id === f.id ? 'bg-bg4 text-text' : 'text-dim hover:bg-bg3'
-                          }`}
-                          title={f.description || f.name}
-                        >
-                          <span className="truncate">{f.name}</span>
-                          <span className="font-mono text-[11px] text-faint">{num(f.count)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {manualFolders.length > 0 && (
-                    <div className="mb-1.5">
-                      <div className="mb-1 flex items-center gap-1.5 px-1">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-faint">
-                          Manual
-                        </span>
-                        <span className="font-mono text-[10px] text-faint">{num(manualFolders.length)}</span>
-                      </div>
-                      {manualFolders.map((f) => (
-                        <button
-                          key={f.id}
-                          onClick={() => {
-                            setFolder(folder?.id === f.id ? null : f)
-                            setOffset(0)
-                          }}
-                          className={`flex w-full cursor-pointer items-center justify-between rounded-[6px] px-2 py-1 text-left text-[12px] transition-colors ${
-                            folder?.id === f.id ? 'bg-bg4 text-text' : 'text-dim hover:bg-bg3'
-                          }`}
-                          title={f.description || f.name}
-                        >
-                          <span className="truncate">{f.name}</span>
-                          <span className="font-mono text-[11px] text-faint">{num(f.count)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {filtered.length === 0 && (
-                    <p className="px-2 text-[12px] text-faint">
-                      {q ? 'no folders match' : 'no folders yet'}
-                    </p>
-                  )}
-                </div>
-              )
-            })()}
           </div>
         </aside>
 

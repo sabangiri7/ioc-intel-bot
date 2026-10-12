@@ -40,10 +40,30 @@
   --color-valid: #3fb27f;
   --color-invalid: #f2555a;
   --color-unknown: #8a919c;
+  --color-danger: #e5484d;
+  --color-danger-ink: #ffb3b3;
+  --color-ok: var(--color-valid);
+
+  /* Legacy aliases (Phase 1–2 transition tokens). */
+  --color-bg1: var(--color-surface-1);
+  --color-bg2: var(--color-surface-2);
+  --color-bg3: var(--color-surface-3);
+  --color-bg4: rgb(255 255 255 / 0.04);
+  --color-line2: var(--color-line);
+  --color-text: var(--color-fg);
+  --color-text-dim: var(--color-fg-muted);
+  --color-text-faint: var(--color-fg-subtle);
+  --color-text-crit: var(--color-critical);
+  --color-text-high: var(--color-high);
+  --color-text-med: var(--color-medium);
+  --color-text-low: var(--color-low);
+  --color-text-accent: var(--color-accent);
+  --color-text-accent-ink: #05131f;
 
   /* One accent is for focus/selection only. */
   --radius-ctl: 4px;
   --radius-panel: 6px;
+  --radius-card: 8px;
 
   --font-sans: 'Geist', 'Instrument Sans', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
@@ -119,6 +139,13 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-fg-subtle);
+  font-weight: 500;
+}
+
+/* 12px muted label used for form field titles. */
+@utility label {
+  font-size: 12px;
+  color: var(--color-fg-muted);
   font-weight: 500;
 }
 

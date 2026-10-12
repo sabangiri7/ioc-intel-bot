@@ -146,7 +146,7 @@ export default function FolderManager({ notify }: { notify: (m: string, e?: bool
                 </div>
                 <span className="font-mono text-[12px] text-dim">{num(f.count)} IOCs</span>
                 <span className="text-[10px] text-faint">
-                  ({AUTO_GROUP_LABELS[f.group] ?? f.group})
+                  ({AUTO_GROUP_LABELS[f.group ?? 'malware'] ?? f.group})
                 </span>
               </div>
             ))}
@@ -186,11 +186,10 @@ export default function FolderManager({ notify }: { notify: (m: string, e?: bool
                       />
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={saveEdit} disabled={saving}>
+                      <Button onClick={saveEdit} disabled={saving}>
                         {saving ? 'Saving...' : 'Save'}
                       </Button>
                       <Button
-                        size="sm"
                         variant="ghost"
                         onClick={() => setEditing(null)}
                       >
@@ -208,7 +207,6 @@ export default function FolderManager({ notify }: { notify: (m: string, e?: bool
                     </div>
                     <span className="font-mono text-[12px] text-dim">{num(f.count)} IOCs</span>
                     <Button
-                      size="sm"
                       variant="ghost"
                       className="py-0.5 text-[11.5px]"
                       onClick={() => startEdit(f)}
@@ -216,7 +214,6 @@ export default function FolderManager({ notify }: { notify: (m: string, e?: bool
                       Edit
                     </Button>
                     <Button
-                      size="sm"
                       variant="ghost"
                       className="py-0.5 text-[11.5px] text-danger"
                       onClick={() => deleteFolder(f)}
@@ -257,10 +254,10 @@ export default function FolderManager({ notify }: { notify: (m: string, e?: bool
           </div>
           <ErrorText>{createError}</ErrorText>
           <div className="mt-3 flex gap-2">
-            <Button variant="primary" size="sm" onClick={createFolder} disabled={creating || !newName.trim()}>
+            <Button variant="primary" onClick={createFolder} disabled={creating || !newName.trim()}>
               {creating ? 'Creating...' : 'Create'}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => { setShowCreate(false); setCreateError('') }}>
+            <Button variant="ghost" onClick={() => { setShowCreate(false); setCreateError('') }}>
               Cancel
             </Button>
           </div>
